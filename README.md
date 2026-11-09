@@ -11,6 +11,7 @@ day–night cycle.
 - **Pedestrians** — small figures stroll the sidewalks around each block.
 - **Day–night cycle** — animated sun and moon, sky and fog gradients, stars, streetlights at dusk, windows that light up (and go dark) through the night, glowing headlights.
 - **Inspect buildings** — click any building for its generated name, type, floor count, height and address.
+- **Drive a car** — hover to highlight, click any car to take the wheel with a chase camera, arcade physics and building collisions; AI traffic yields to you.
 - **HUD** — live clock, time-of-day scrubber, simulation speed slider and a *Regenerate City* button.
 
 ## Running it
@@ -29,10 +30,13 @@ Append `?seed=<code>` (the seed shown in the HUD) to the URL to rebuild a specif
 | Orbit | Left-drag (one-finger drag on touch) |
 | Pan | Right-drag (two-finger drag) |
 | Zoom | Scroll wheel / pinch |
-| Inspect a building | Click it |
+| Inspect a building | Click it (when not driving) |
 | Close the info panel | Click empty space, the × button, or press `Esc` |
-| Pause / resume | `Space` |
-| New city | `R` or the *Regenerate City* button |
+| Enter a car | Hover a car (highlight) then click it |
+| Drive | `W`/`↑` accelerate · `S`/`↓` brake/reverse · `A`/`D` or `←`/`→` steer |
+| Exit car | `Esc` or the on-screen *Exit car* button (car returns to AI traffic) |
+| Pause / resume | `Space` (also works while driving) |
+| New city | `R` or the *Regenerate City* button (disabled while driving) |
 
 ## Tech
 

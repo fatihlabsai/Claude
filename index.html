@@ -80,6 +80,19 @@
     font-size: 12px; color: var(--muted); background: rgba(14, 18, 28, 0.55); border: 1px solid var(--line);
     white-space: nowrap; pointer-events: none; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
 
+  #drive { left: 50%; bottom: 60px; transform: translateX(-50%); padding: 12px 14px 12px 20px; display: flex; align-items: center;
+    gap: 18px; user-select: none; transition: opacity 0.2s ease, transform 0.2s ease; }
+  #drive.hidden { opacity: 0; transform: translate(-50%, 10px); pointer-events: none; }
+  .speedo { display: flex; align-items: baseline; gap: 7px; min-width: 122px; }
+  #speedo { font-size: 38px; font-weight: 650; line-height: 1; min-width: 2.1ch; text-align: right; font-variant-numeric: tabular-nums; }
+  #speedoUnit { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  #exitCar { padding: 10px 16px; border-radius: 11px; border: 1px solid rgba(255, 184, 107, 0.45); white-space: nowrap;
+    background: linear-gradient(180deg, rgba(255, 184, 107, 0.26), rgba(255, 184, 107, 0.1)); font-weight: 600; font-size: 14px;
+    transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease; }
+  #exitCar:hover { background: linear-gradient(180deg, rgba(255, 184, 107, 0.4), rgba(255, 184, 107, 0.18)); border-color: rgba(255, 184, 107, 0.8); }
+  #exitCar:active { transform: scale(0.97); }
+  #exitCar kbd { font: inherit; font-size: 11px; color: var(--muted); margin-left: 6px; }
+
   #loader { position: fixed; inset: 0; display: grid; place-items: center; background: #0a0d16; color: var(--muted);
     font-size: 13px; letter-spacing: 2px; text-transform: uppercase; transition: opacity 0.6s ease; z-index: 10; }
   #loader.done { opacity: 0; pointer-events: none; }
@@ -146,7 +159,12 @@
   </dl>
 </aside>
 
-<div id="hint">Drag to orbit · Right-drag to pan · Scroll to zoom · Click a building · Space to pause</div>
+<section id="drive" class="panel hidden" aria-label="Driving">
+  <div class="speedo"><span id="speedo">0</span><span id="speedoUnit">km/h</span></div>
+  <button id="exitCar" type="button">Exit car <kbd>Esc</kbd></button>
+</section>
+
+<div id="hint">Drag to orbit · Scroll to zoom · Click a building to inspect · Click a car to drive it · Space to pause</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -183,7 +201,14 @@ const T_GREEN = 10, T_YELLOW = 2.5, T_ALLRED = 2;
 const CYCLE = 2 * (T_GREEN + T_YELLOW + T_ALLRED);
 const GREEN = 0, YELLOW = 1, RED = 2;
 
-const DAY_SECONDS = 240;           // real seconds per simulated day at 1× speed
+// Player-driven car (arcade physics; 1 unit ≈ 1 m)
+const P_VMAX = 30, P_VREV = 9;                         // top speed forward / in reverse
+const P_ACCEL = 11, P_BRAKE = 24, P_DRAG = 2.2;
+const P_GRIP = 20;                                     // lateral acceleration limit → less steering at speed
+const P_R = 1.0, P_OFF = 1.15;                         // a car collides as two circles, P_OFF ahead of / behind its centre
+const WORLD_LIMIT = HALF + 170;
+
+const DAY_SECONDS = 240;          // real seconds per simulated day at 1× speed
 
 /* ───────────────────────────── Utilities ───────────────────────────── */
 
@@ -551,9 +576,11 @@ function buildCity(seed) {
   const W = Array.from({ length: WINDOW_GROUPS }, () => new GeoBuilder(false));
   const buildings = [];
   const trunkM = [], foliageM = [], foliageC = [];
+  const solidBoxes = [], solidPosts = [];                                  // obstacles for the player-driven car
 
   function addTree(x, z, s = 1, y = BASE_Y) {
     const th = 1.7 * s;
+    solidPosts.push([x, z, 0.3 * s]);
     trunkM.push(mat(x, y, z, s, th, s));
     foliageM.push(mat(x, y + th + 1.25 * s, z, 1.75 * s, 2.0 * s, 1.75 * s, rand() * Math.PI));
     foliageC.push(shade(pick(PALETTE.foliage)));
@@ -743,6 +770,7 @@ function buildCity(seed) {
       B.box(x, BASE_Y + 0.3, z, 7, 0.6, 7, stone);
       B.box(x, BASE_Y + 0.62, z, 5.8, 0.06, 5.8, water);
       B.box(x, BASE_Y + 1.0, z, 0.8, 1.4, 0.8, stone);
+      solidBoxes.push([x - 3.5, z - 3.5, x + 3.5, z + 3.5]);
       for (let k = ri(12, 18); k > 0; k--) {
         const tx = rr(3.2, LOT / 2 - 2) * (chance(0.5) ? 1 : -1), tz = rr(3.2, LOT / 2 - 2) * (chance(0.5) ? 1 : -1);
         addTree(x + tx, z + tz, rr(0.85, 1.5));
@@ -770,6 +798,11 @@ function buildCity(seed) {
     const x = rr(-HALF - 190, HALF + 190), z = rr(-HALF - 190, HALF + 190);
     if (Math.abs(x) < HALF + HR + 5 && Math.abs(z) < HALF + HR + 5) continue;
     addTree(x, z, rr(1.1, 2.3), -0.06);
+  }
+
+  for (const { box } of buildings) {     // box is padded by 0.6 for the selection outline; collide a little tighter
+    const hw = box.w / 2 - 0.4, hd = box.d / 2 - 0.4;
+    solidBoxes.push([box.cx - hw, box.cz - hd, box.cx + hw, box.cz + hd]);
   }
 
   /* ── Road network ── */
@@ -942,6 +975,7 @@ function buildCity(seed) {
     let pending = 0;
     for (const o of n.occ) if (o.nextDir === nd) pending++;
     if (lastS - pending * SLOT < SLOT) return false;             // never block the box
+    if (player && Math.abs(player.x - n.x) < HR + 2.5 && Math.abs(player.z - n.z) < HR + 2.5) return false;
     if (!n.signal) return true;
 
     const st = lightState(n, d & 1, t);
@@ -970,6 +1004,7 @@ function buildCity(seed) {
     }
 
     for (const c of cars) {
+      if (c.mode === 2) continue;                                // driven by the player
       let gap, cap = c.vmax;
       if (c.mode === 0) {
         const lead = c.lead;
@@ -988,6 +1023,7 @@ function buildCity(seed) {
         gap = boxGap(c, c.u);
         if (c.path.turn) cap = Math.min(cap, c.path.wide ? TURN_V * 1.3 : TURN_V);
       }
+      if (player) gap = Math.min(gap, playerGap(c));
 
       const target = Math.min(cap, Math.sqrt(2 * BRAKE * Math.max(0, gap - MIN_GAP)));
       const dv = target - c.v;
@@ -1010,24 +1046,207 @@ function buildCity(seed) {
     }
   }
 
+  /** World position + heading of an AI car, derived from its lane / turn-path coordinate. */
+  function pose(c) {
+    if (c.mode === 2) return;                                    // the player's pose is integrated directly
+    const n = c.node, f = DIRS[c.dir];
+    let x, z, hx = f[0], hz = f[1];
+    if (c.mode === 0) {
+      const r = RIGHT[c.dir], dist = HR + SEG - c.s;
+      x = n.x - f[0] * dist + r[0] * LANE; z = n.z - f[1] * dist + r[1] * LANE;
+    } else if (!c.path.turn) {
+      x = n.x + c.path.p0x + f[0] * c.u; z = n.z + c.path.p0z + f[1] * c.u;
+    } else {
+      const p = c.path, ang = c.u / p.a, cs = Math.cos(ang), sn = Math.sin(ang);
+      x = n.x + p.cx + p.ax * cs + p.bx * sn; z = n.z + p.cz + p.az * cs + p.bz * sn;
+      hx = (-p.ax * sn + p.bx * cs) / p.a; hz = (-p.az * sn + p.bz * cs) / p.a;
+    }
+    c.x = x; c.z = z; c.hx = hx; c.hz = hz;
+  }
+
+  /* ── Player-driven car ── */
+  let player = null;                 // the car object currently under user control (mode 2), or null
+  let hoverIdx = -1;
+  const HOVER_TINT = colorOf(0x9fd6ff), _col = new THREE.Color();
+
+  function setHover(k) {
+    if (k === hoverIdx) return;
+    if (hoverIdx >= 0) carMesh.setColorAt(hoverIdx, carColors[hoverIdx]);
+    hoverIdx = k;
+    if (k >= 0) carMesh.setColorAt(k, _col.copy(carColors[k]).lerp(HOVER_TINT, 0.55).multiplyScalar(1.25));
+    carMesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Nearest car hit by a ray (closer than maxDist), tested against a slightly padded oriented box per car. */
+  function pickCar(ray, maxDist = Infinity) {
+    const o = ray.origin, dir = ray.direction;
+    let best = -1, bestT = maxDist;
+    for (let k = 0; k < cars.length; k++) {
+      const c = cars[k];
+      const dx = o.x - c.x, dz = o.z - c.z;
+      const pad = 0.25 + Math.min(1.4, Math.hypot(dx, o.y, dz) * 0.004);      // easier to hit from far away
+      // Ray in the car's frame: local +z is the heading, local +x is (hz, -hx).
+      const lo = [dx * c.hz - dz * c.hx, o.y - (c.y || 0) - 0.85, dx * c.hx + dz * c.hz];
+      const ld = [dir.x * c.hz - dir.z * c.hx, dir.y, dir.x * c.hx + dir.z * c.hz];
+      const half = [0.95 + pad, 0.85 + pad, CAR_LEN / 2 + pad];
+      let t0 = 0, t1 = bestT, hit = true;
+      for (let a = 0; a < 3 && hit; a++) {
+        if (Math.abs(ld[a]) < 1e-9) { hit = Math.abs(lo[a]) <= half[a]; continue; }
+        let ta = (-half[a] - lo[a]) / ld[a], tb = (half[a] - lo[a]) / ld[a];
+        if (ta > tb) { const tmp = ta; ta = tb; tb = tmp; }
+        t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+        hit = t0 <= t1;
+      }
+      if (hit) { best = k; bestT = t0; }
+    }
+    return best;
+  }
+
+  /** Free distance from an AI car's nose to the player car, if the player sits in the corridor ahead of it. */
+  function playerGap(c) {
+    pose(c);
+    const p = player, dx = p.x - c.x, dz = p.z - c.z;
+    const fwd = dx * c.hx + dz * c.hz;
+    if (fwd <= 0 || fwd > 50) return Infinity;
+    const cs = Math.abs(p.hx * c.hx + p.hz * c.hz), sn = Math.abs(p.hx * c.hz - p.hz * c.hx);
+    const halfLat = 0.95 * cs + (CAR_LEN / 2) * sn, halfLong = (CAR_LEN / 2) * cs + 0.95 * sn;   // player's extent in this car's frame
+    if (Math.abs(dx * c.hz - dz * c.hx) > halfLat + 0.95 + 0.35) return Infinity;
+    const g = fwd - halfLong - CAR_LEN / 2;
+    // A car about to turn (or turning) only looks as far as its path stays roughly straight.
+    const reach = !c.path.turn ? 50 : c.mode === 0 ? SEG - c.s + 2 : 7;
+    return g > reach ? Infinity : g;
+  }
+
+  function takeControl(k) {
+    if (player) releaseControl();
+    const c = cars[k];
+    pose(c);
+    const i = c.node.occ.indexOf(c);
+    if (i >= 0) c.node.occ.splice(i, 1);
+    c.x += c.bx || 0; c.z += c.bz || 0;                          // absorb any leftover hand-back blend
+    c.ry = Math.atan2(c.hx, c.hz) + (c.br || 0);
+    c.hx = Math.sin(c.ry); c.hz = Math.cos(c.ry);
+    c.y = c.by || 0; c.bx = c.bz = c.by = c.br = 0;
+    c.mode = 2; c.lead = null; c.cleared = false; c.steer = 0;
+    player = c;
+    return c;
+  }
+
+  /** Hand the driven car back to its AI driver: snap onto the best-matching lane, then blend the visual offset away. */
+  function releaseControl() {
+    const c = player;
+    if (!c) return;
+    player = null;
+    const ox = c.x, oz = c.z, oy = c.y, ory = c.ry;
+    let best = null, bestCost = Infinity;
+    for (const n of nodes) for (let d = 0; d < 4; d++) {
+      if (!neighbor(n, (d + 2) % 4)) continue;
+      const f = DIRS[d], r = RIGHT[d], lane = n.id * 4 + d;
+      const s = clamp(HR + SEG - ((n.x - ox) * f[0] + (n.z - oz) * f[1]), 1, STOP_S - 1);
+      const dist = HR + SEG - s;
+      const lx = n.x - f[0] * dist + r[0] * LANE, lz = n.z - f[1] * dist + r[1] * LANE;
+      let cost = Math.hypot(lx - ox, lz - oz) + (1 - (c.hx * f[0] + c.hz * f[1])) * 9;   // near, and facing the right way
+      for (const o of cars) if (o !== c && o.mode === 0 && o.lane === lane && Math.abs(o.s - s) < SLOT) cost += 60;
+      if (cost < bestCost) { bestCost = cost; best = [n, d, s]; }
+    }
+    enterLane(c, best[0], best[1], best[2]);
+    c.v = clamp(c.v, 0, c.vmax);
+    pose(c);
+    const dr = ory - Math.atan2(c.hx, c.hz);
+    c.bx = ox - c.x; c.bz = oz - c.z; c.by = oy; c.y = 0;
+    c.br = Math.atan2(Math.sin(dr), Math.cos(dr));
+  }
+
+  const onSlab = (x, z) => {
+    const gx = x + HALF, gz = z + HALF;
+    if (gx < 0 || gz < 0 || gx > GRID * PITCH || gz > GRID * PITCH) return false;
+    return Math.abs((gx % PITCH) - PITCH / 2) < BLOCK / 2 && Math.abs((gz % PITCH) - PITCH / 2) < BLOCK / 2;
+  };
+
+  /** Move the player out of an obstacle along the contact normal and take the hit out of its speed. */
+  function pushOut(c, nx, nz, pen, dt) {
+    c.x += nx * pen; c.z += nz * pen;
+    const a = c.hx * nx + c.hz * nz;
+    if (c.v * a >= 0) return;                                    // already moving away
+    const k = Math.abs(a);
+    if (k > 0.55) c.v = Math.abs(c.v) > 2.5 ? -c.v * 0.28 * k : 0;   // head-on: bounce back
+    else c.v *= 1 - Math.min(1, 5 * k * dt);                         // glancing: scrape along
+  }
+  function collideCircle(c, px, pz, ox, oz, rad, dt) {
+    const dx = px - ox, dz = pz - oz, d2 = dx * dx + dz * dz, sum = P_R + rad;
+    if (d2 >= sum * sum) return false;
+    const d = Math.sqrt(d2);
+    if (d > 1e-5) pushOut(c, dx / d, dz / d, sum - d, dt); else pushOut(c, -c.hx, -c.hz, sum, dt);
+    return true;
+  }
+  function collidePlayer(c, dt) {
+    for (const sg of [1, -1]) {
+      let px = c.x + c.hx * P_OFF * sg, pz = c.z + c.hz * P_OFF * sg;
+      const sync = () => { px = c.x + c.hx * P_OFF * sg; pz = c.z + c.hz * P_OFF * sg; };
+      for (const b of solidBoxes) {
+        if (px < b[0] - P_R || px > b[2] + P_R || pz < b[1] - P_R || pz > b[3] + P_R) continue;
+        const qx = clamp(px, b[0], b[2]), qz = clamp(pz, b[1], b[3]);
+        const dx = px - qx, dz = pz - qz, d2 = dx * dx + dz * dz;
+        if (d2 >= P_R * P_R) continue;
+        if (d2 > 1e-10) { const d = Math.sqrt(d2); pushOut(c, dx / d, dz / d, P_R - d, dt); }
+        else {                                                   // centre is inside the box: leave through the nearest face
+          const l = px - b[0], r = b[2] - px, t = pz - b[1], u = b[3] - pz, m = Math.min(l, r, t, u);
+          if (m === l) pushOut(c, -1, 0, l + P_R, dt); else if (m === r) pushOut(c, 1, 0, r + P_R, dt);
+          else if (m === t) pushOut(c, 0, -1, t + P_R, dt); else pushOut(c, 0, 1, u + P_R, dt);
+        }
+        sync();
+      }
+      for (const t of solidPosts) {
+        if (Math.abs(px - t[0]) > 2 || Math.abs(pz - t[1]) > 2) continue;
+        if (collideCircle(c, px, pz, t[0], t[1], t[2], dt)) sync();
+      }
+      for (const o of cars) {
+        if (o === c || Math.abs(o.x - c.x) > 7 || Math.abs(o.z - c.z) > 7) continue;
+        for (const so of [1, -1]) {
+          if (collideCircle(c, px, pz, o.x + o.hx * P_OFF * so, o.z + o.hz * P_OFF * so, P_R, dt)) sync();
+        }
+      }
+    }
+  }
+
+  /** Arcade driving. input = { throttle: −1…1, steer: −1…1 (positive = left) }. */
+  function stepPlayer(dt, input) {
+    const c = player;
+    let v = c.v;
+    if (input.throttle > 0) v += (v < 0 ? P_BRAKE : P_ACCEL * (1 - 0.8 * v / P_VMAX)) * dt;
+    else if (input.throttle < 0) v -= (v > 0 ? P_BRAKE : P_ACCEL * 0.6) * dt;
+    else {                                                       // coast: rolling friction + air drag
+      const drag = (P_DRAG + 0.012 * v * v) * dt;
+      v = Math.abs(v) <= drag ? 0 : v - Math.sign(v) * drag;
+    }
+    v = clamp(v, -P_VREV, P_VMAX);
+    c.steer += clamp(input.steer - c.steer, -6 * dt, 6 * dt);
+    // Yaw rate: geometric (bicycle-like) at low speed, grip-limited at high speed.
+    const sp = Math.abs(v), yaw = Math.min(sp * 0.26, P_GRIP / Math.max(sp, 0.01));
+    c.ry += c.steer * yaw * Math.sign(v) * dt;
+    c.hx = Math.sin(c.ry); c.hz = Math.cos(c.ry);
+    c.v = v;
+    c.x += c.hx * v * dt; c.z += c.hz * v * dt;
+    collidePlayer(c, dt);
+    if (Math.abs(c.x) > WORLD_LIMIT) { c.x = Math.sign(c.x) * WORLD_LIMIT; c.v *= 0.9; }
+    if (Math.abs(c.z) > WORLD_LIMIT) { c.z = Math.sign(c.z) * WORLD_LIMIT; c.v *= 0.9; }
+    c.y += ((onSlab(c.x, c.z) ? CURB : 0) - c.y) * Math.min(1, 14 * dt);   // hop the kerb
+  }
+
   function renderCars() {
     for (let k = 0; k < cars.length; k++) {
-      const c = cars[k], n = c.node, f = DIRS[c.dir];
-      let x, z, hx = f[0], hz = f[1];
-      if (c.mode === 0) {
-        const r = RIGHT[c.dir], dist = HR + SEG - c.s;
-        x = n.x - f[0] * dist + r[0] * LANE; z = n.z - f[1] * dist + r[1] * LANE;
-      } else if (!c.path.turn) {
-        x = n.x + c.path.p0x + f[0] * c.u; z = n.z + c.path.p0z + f[1] * c.u;
-      } else {
-        const p = c.path, ang = c.u / p.a, cs = Math.cos(ang), sn = Math.sin(ang);
-        x = n.x + p.cx + p.ax * cs + p.bx * sn; z = n.z + p.cz + p.az * cs + p.bz * sn;
-        hx = (-p.ax * sn + p.bx * cs) / p.a; hz = (-p.az * sn + p.bz * cs) / p.a;
+      const c = cars[k];
+      pose(c);
+      let x = c.x, z = c.z, y = 0, ry, sc = c.scale;
+      if (c.mode === 2) { ry = c.ry; y = c.y; }
+      else {
+        ry = Math.atan2(c.hx, c.hz);
+        if (c.bx || c.bz || c.br || c.by) { x += c.bx; z += c.bz; y = c.by; ry += c.br; }
       }
-      const ry = Math.atan2(hx, hz);
-      composeInto(_m, x, 0, z, c.scale, c.scale, c.scale, ry);
+      if (k === hoverIdx) sc *= 1.12;
+      composeInto(_m, x, y, z, sc, sc, sc, ry);
       carMesh.setMatrixAt(k, _m); carLightMesh.setMatrixAt(k, _m);
-      beamMesh.setMatrixAt(k, composeInto(_m, x + hx * 6.4, 0.07, z + hz * 6.4, 4.6, 1, 9.5, ry));
+      beamMesh.setMatrixAt(k, composeInto(_m, x + Math.sin(ry) * 6.4, y + 0.07, z + Math.cos(ry) * 6.4, 4.6, 1, 9.5, ry));
     }
     carMesh.instanceMatrix.needsUpdate = true;
     carLightMesh.instanceMatrix.needsUpdate = true;
@@ -1067,7 +1286,19 @@ function buildCity(seed) {
 
   /* ── Public API ── */
   let simTime = 0;
-  function update(simDt) {
+  function update(simDt, realDt = 0, input = null) {
+    if (player && input && realDt > 0) {                         // the driven car runs in real time, whatever the sim speed
+      const sub = 3;
+      for (let i = 0; i < sub; i++) stepPlayer(realDt / sub, input);
+    }
+    if (realDt > 0) {                                            // ease released cars from where they were left onto their lane
+      const k = Math.exp(-realDt * 4.5);
+      for (const c of cars) {
+        if (c.mode === 2 || !(c.bx || c.bz || c.br || c.by)) continue;
+        c.bx *= k; c.bz *= k; c.br *= k; c.by *= k;
+        if (Math.abs(c.bx) + Math.abs(c.bz) + Math.abs(c.br) < 0.01) c.bx = c.bz = c.br = c.by = 0;
+      }
+    }
     if (simDt > 0) {
       const steps = Math.min(12, Math.max(1, Math.ceil(simDt / (1 / 30)))), dt = simDt / steps;
       for (let i = 0; i < steps; i++) { simTime += dt; stepCars(dt, simTime); }
@@ -1081,6 +1312,8 @@ function buildCity(seed) {
 
   return {
     seed, group, buildings, buildingMesh, carCount: cars.length, update,
+    pickCar, setHover, takeControl, releaseControl,
+    get hoveredCar() { return hoverIdx >= 0 ? cars[hoverIdx] : null; },
     setNight(on) { poolMesh.visible = beamMesh.visible = on; },
     findBuilding(faceIndex) {
       let lo = 0, hi = buildings.length - 1;
@@ -1183,10 +1416,27 @@ const ui = {
   seed: $('statSeed'), buildings: $('statBuildings'), cars: $('statCars'), fps: $('statFps'),
   info: $('info'), infoClose: $('infoClose'), infoType: $('infoType'), infoName: $('infoName'), infoAddr: $('infoAddr'),
   infoFloors: $('infoFloors'), infoHeight: $('infoHeight'), infoDistrict: $('infoDistrict'), infoYear: $('infoYear'),
+  drive: $('drive'), speedo: $('speedo'), speedoUnit: $('speedoUnit'), exitCar: $('exitCar'), hint: $('hint'),
 };
+const HINT_ORBIT = ui.hint.textContent;
+const HINT_DRIVE = 'W / ↑ accelerate · S / ↓ brake & reverse · A D / ← → steer · Space to pause · Esc to exit the car';
 
 const state = { hours: 16.6, speed: 1, lastSpeed: 1, scrubbing: false, selected: null };
 let city = null;
+let down = null, hover = null;               // pointer bookkeeping for click / hover picking
+const canvas = renderer.domElement;
+
+// Drive mode: `car` is the city's car object under user control (null while orbiting).
+const drive = {
+  car: null, keys: new Set(), input: { throttle: 0, steer: 0 },
+  look: new THREE.Vector3(), goal: new THREE.Vector3(), handback: 0, lastSpeed: '',
+};
+const DRIVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+// Outline shown around the car under the cursor
+const carMarker = new THREE.LineSegments(new THREE.EdgesGeometry(GEO.box), new THREE.LineBasicMaterial({ color: 0xbfe4ff, toneMapped: false }));
+carMarker.visible = false;
+scene.add(carMarker);
 
 // Selection highlight
 const selection = new THREE.Group();
@@ -1215,8 +1465,78 @@ function select(b) {
   ui.info.classList.remove('hidden');
 }
 
-function generate(seed) {
+function enterDrive(k) {
+  if (drive.car) return;
   select(null);
+  city.setHover(-1);
+  carMarker.visible = false;
+  canvas.style.cursor = '';
+  hover = null;
+  drive.car = city.takeControl(k);
+  drive.keys.clear();
+  drive.handback = 0;
+  drive.look.copy(controls.target);          // the chase camera eases in from the current orbit view
+  drive.lastSpeed = '';
+  // Disable orbiting once this click has finished dispatching, so OrbitControls ends its own drag state cleanly.
+  setTimeout(() => { if (drive.car) controls.enabled = false; }, 0);
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  ui.drive.classList.remove('hidden');
+  ui.hint.textContent = HINT_DRIVE;
+}
+
+/** Leave the car. With release = false the car is simply dropped (its city is about to be rebuilt). */
+function exitDrive(release = true) {
+  const c = drive.car;
+  if (!c) return;
+  drive.car = null;
+  drive.keys.clear();
+  // Orbit around the spot where the car was left, from behind and above it.
+  controls.target.set(c.x, 2, c.z);
+  drive.goal.set(c.x - c.hx * 62, 46, c.z - c.hz * 62);
+  drive.handback = 0.9;                      // seconds of camera glide before OrbitControls takes over again
+  if (release) city.releaseControl();
+  ui.drive.classList.add('hidden');
+  ui.hint.textContent = HINT_ORBIT;
+}
+
+const _camGoal = new THREE.Vector3(), _lookGoal = new THREE.Vector3();
+function updateCamera(dt) {
+  const c = drive.car;
+  if (c) {                                   // chase camera: behind and above, pulling back a little with speed
+    const sp = Math.abs(c.v), dist = 10 + sp * 0.1, height = 4.6 + sp * 0.04;
+    _camGoal.set(c.x - c.hx * dist, c.y + height, c.z - c.hz * dist);
+    camera.position.lerp(_camGoal, 1 - Math.exp(-dt * 5.5));
+    _lookGoal.set(c.x + c.hx * 5, c.y + 1.4, c.z + c.hz * 5);
+    drive.look.lerp(_lookGoal, 1 - Math.exp(-dt * 9));
+    camera.lookAt(drive.look);
+  } else if (drive.handback > 0) {           // glide back out to an orbit view
+    drive.handback -= dt;
+    camera.position.lerp(drive.goal, 1 - Math.exp(-dt * 6));
+    drive.look.lerp(controls.target, 1 - Math.exp(-dt * 9));
+    camera.lookAt(drive.look);
+    if (drive.handback <= 0) { controls.enabled = true; controls.update(); }
+  } else {
+    controls.update();
+  }
+}
+
+function updateDriveHud() {
+  const c = drive.car;
+  if (!c) return;
+  const k = drive.keys, on = (a, b) => (k.has(a) || k.has(b) ? 1 : 0);
+  drive.input.throttle = on('KeyW', 'ArrowUp') - on('KeyS', 'ArrowDown');
+  drive.input.steer = on('KeyA', 'ArrowLeft') - on('KeyD', 'ArrowRight');
+  const text = `${Math.round(Math.abs(c.v) * 3.6)}|${state.speed === 0 ? 'paused' : c.v < -0.3 ? 'km/h · R' : 'km/h'}`;
+  if (text !== drive.lastSpeed) {
+    drive.lastSpeed = text;
+    [ui.speedo.textContent, ui.speedoUnit.textContent] = text.split('|');
+  }
+}
+
+function generate(seed) {
+  exitDrive(false);
+  select(null);
+  carMarker.visible = false;
   if (city) city.dispose();
   city = buildCity(seed);
   scene.add(city.group);
@@ -1230,21 +1550,25 @@ generate(Number.isFinite(urlSeed) && urlSeed > 0 ? urlSeed : randomSeed());
 
 // Picking
 const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
-function pickBuilding(clientX, clientY) {
+/** What is under the cursor: a car index (−1 if none), or else a building. Cars hidden behind a building don't count. */
+function pick(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
   pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const hit = raycaster.intersectObject(city.buildingMesh, false)[0];
-  return hit ? city.findBuilding(hit.faceIndex) : null;
+  const car = city.pickCar(raycaster.ray, hit ? hit.distance : Infinity);
+  return { car, building: car < 0 && hit ? city.findBuilding(hit.faceIndex) : null };
 }
-let down = null, hover = null;
-const canvas = renderer.domElement;
 canvas.addEventListener('pointerdown', (ev) => { down = { x: ev.clientX, y: ev.clientY, button: ev.button }; });
 canvas.addEventListener('pointerup', (ev) => {
-  if (down && down.button === 0 && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 6) select(pickBuilding(ev.clientX, ev.clientY));
+  if (!drive.car && drive.handback <= 0 && down && down.button === 0 && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 6) {
+    const p = pick(ev.clientX, ev.clientY);
+    if (p.car >= 0) enterDrive(p.car); else select(p.building);
+  }
   down = null;
 });
 canvas.addEventListener('pointercancel', () => { down = null; });
+// The hover position is kept (not consumed) so a car that drives under a resting cursor still lights up.
 canvas.addEventListener('pointermove', (ev) => { hover = ev.buttons === 0 && ev.pointerType === 'mouse' ? { x: ev.clientX, y: ev.clientY } : null; });
 canvas.addEventListener('pointerleave', () => { hover = null; });
 
@@ -1260,14 +1584,22 @@ window.addEventListener('pointerup', () => { state.scrubbing = false; });
 ui.time.addEventListener('input', () => { state.hours = parseFloat(ui.time.value) % 24; });
 ui.regen.addEventListener('click', () => generate(randomSeed()));
 ui.infoClose.addEventListener('click', () => select(null));
+ui.exitCar.addEventListener('click', () => { exitDrive(); ui.exitCar.blur(); });
 window.addEventListener('keydown', (ev) => {
-  if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLButtonElement || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (drive.car) {                           // driving keys work wherever the focus is
+    if (DRIVE_KEYS.has(ev.code)) { drive.keys.add(ev.code); ev.preventDefault(); return; }
+    if (ev.key === 'Escape') { exitDrive(); return; }
+  }
+  if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLButtonElement) return;
   if (ev.code === 'Space') {
     ev.preventDefault();
     if (state.speed > 0) { state.lastSpeed = state.speed; setSpeed(0); } else setSpeed(state.lastSpeed || 1);
-  } else if (ev.key === 'r' || ev.key === 'R') generate(randomSeed());
+  } else if (ev.key === 'r' || ev.key === 'R') { if (!drive.car) generate(randomSeed()); }   // too close to WASD to keep while driving
   else if (ev.key === 'Escape') select(null);
 });
+window.addEventListener('keyup', (ev) => { drive.keys.delete(ev.code); });
+window.addEventListener('blur', () => { drive.keys.clear(); });
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -1305,15 +1637,24 @@ renderer.setAnimationLoop(() => {
   const simDt = dt * state.speed;
 
   state.hours = (state.hours + (simDt * 24) / DAY_SECONDS) % 24;
-  city.update(simDt);
+  updateDriveHud();
+  city.update(simDt, state.speed > 0 ? dt : 0, drive.input);   // pausing the simulation also freezes the driven car
   clouds.update(simDt);
-  controls.update();
+  updateCamera(dt);
   updateEnvironment(state.hours);
   updateHud();
 
-  if (hover) {
-    canvas.style.cursor = pickBuilding(hover.x, hover.y) ? 'pointer' : '';
-    hover = null;
+  if (!drive.car && drive.handback <= 0) {
+    const p = hover ? pick(hover.x, hover.y) : null;
+    city.setHover(p ? p.car : -1);
+    if (hover) canvas.style.cursor = p.car >= 0 || p.building ? 'pointer' : '';
+    const hc = city.hoveredCar;
+    carMarker.visible = !!hc;
+    if (hc) {
+      carMarker.position.set(hc.x + (hc.bx || 0), 0.95, hc.z + (hc.bz || 0));
+      carMarker.rotation.y = Math.atan2(hc.hx, hc.hz) + (hc.br || 0);
+      carMarker.scale.set(2.5, 1.9, CAR_LEN + 0.8);
+    }
   }
   if (selection.visible) selection.children[0].material.color.setHSL(0.57, 0.9, 0.72 + Math.sin(timer.elapsedTime * 4) * 0.12);
 
