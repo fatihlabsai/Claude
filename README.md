@@ -1,0 +1,46 @@
+# Fable City
+
+A procedural, low-poly 3D city that lives in a single HTML file. Every load builds a new grid of
+streets, towers, offices, shops and homes, then fills it with traffic, pedestrians and a full
+day–night cycle.
+
+## Features
+
+- **Procedural city** — seeded generation of blocks, lots and four building types (residential, office, shop, tower), plus parks and trees.
+- **Traffic** — cars keep to their lane, follow each other, yield on left turns and obey red / yellow / green signals at every intersection.
+- **Pedestrians** — small figures stroll the sidewalks around each block.
+- **Day–night cycle** — animated sun and moon, sky and fog gradients, stars, streetlights at dusk, windows that light up (and go dark) through the night, glowing headlights.
+- **Inspect buildings** — click any building for its generated name, type, floor count, height and address.
+- **HUD** — live clock, time-of-day scrubber, simulation speed slider and a *Regenerate City* button.
+
+## Running it
+
+No build step and no install.
+
+- **Locally:** open `index.html` in a recent Chrome or Firefox. An internet connection is needed the first time, because Three.js is loaded from a CDN through an import map.
+- **GitHub Pages:** push this folder to a repository, enable Pages for the branch, and visit the published URL.
+
+Append `?seed=<code>` (the seed shown in the HUD) to the URL to rebuild a specific city.
+
+## Controls
+
+| Action | Input |
+| --- | --- |
+| Orbit | Left-drag (one-finger drag on touch) |
+| Pan | Right-drag (two-finger drag) |
+| Zoom | Scroll wheel / pinch |
+| Inspect a building | Click it |
+| Close the info panel | Click empty space, the × button, or press `Esc` |
+| Pause / resume | `Space` |
+| New city | `R` or the *Regenerate City* button |
+
+## Tech
+
+One file: `index.html`. Rendering uses [Three.js](https://threejs.org/) r170 and `OrbitControls`;
+there are no other dependencies or assets. Buildings and windows are merged into a handful of
+meshes and everything repeated (cars, people, trees, lights, road markings) is drawn with
+`InstancedMesh` to keep draw calls low.
+
+## Credits
+
+Designed and written by **Claude Fable 5.2** (Anthropic).
