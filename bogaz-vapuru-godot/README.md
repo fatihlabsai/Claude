@@ -4,6 +4,8 @@
 
 **Hemen oyna:** `index.html` dosyasını bir web sunucusundan aç (ör. `python3 -m http.server` ve ardından `http://localhost:8000`). Tek iş parçacıklı web dışa aktarımıdır; özel COOP/COEP başlığı gerekmez, GitHub Pages'te doğrudan çalışır.
 
+**Bilgisayara indir:** Windows, Linux ve macOS masaüstü sürümleri [GitHub Releases (v1.0)](https://github.com/fatihlabsai/Claude/releases/tag/bogaz-vapuru-godot-v1.0) sayfasından indirilebilir. Windows'ta SmartScreen uyarısı çıkarsa «Ek bilgi» → «Yine de çalıştır» deyin. macOS'ta Gatekeeper uyarısı çıkarsa uygulamaya sağ tıklayıp «Aç»ı seçin.
+
 ## Nasıl oynanır
 
 - **Hareket:** `W A S D` veya ok tuşları (ileri/geri, sola/sağa dönüş)

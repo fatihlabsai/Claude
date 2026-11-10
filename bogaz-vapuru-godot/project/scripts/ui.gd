@@ -826,20 +826,6 @@ func show_screen(name: String) -> void:
 		if f:
 			f.release_focus()
 
-func debug_rects() -> Dictionary:
-	var out := {}
-	for k in screens:
-		var b = screens[k].primary
-		if b and screens[k].root.visible:
-			var r: Rect2 = (b as Control).get_global_rect()
-			out[k] = [r.position.x, r.position.y, r.size.x, r.size.y]
-	if touch_root.visible:
-		var jr := joy.get_global_rect()
-		var sr := simit_btn.get_global_rect()
-		out["joy"] = [jr.position.x, jr.position.y, jr.size.x, jr.size.y]
-		out["simit"] = [sr.position.x, sr.position.y, sr.size.x, sr.size.y]
-	return out
-
 func back_to_title() -> void:
 	if current in ["how", "scores"]:
 		main.sfx.play("click", -4)

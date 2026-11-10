@@ -1480,23 +1480,6 @@ func _process(delta: float) -> void:
 	water_mat.set_shader_parameter("cur_vec", Vector2(cos(cur.ang), sin(cur.ang)) * cur.str)
 	for k in layers:
 		layers[k].queue_redraw()
-	_publish_state(delta)
-
-# Small read-only status object for automated browser tests (window.__bogaz).
-var _pub_t := 0.0
-func _publish_state(delta: float) -> void:
-	if not OS.has_feature("web"):
-		return
-	_pub_t -= delta
-	if _pub_t > 0:
-		return
-	_pub_t = 0.25
-	var info := {
-		"state": state, "screen": ui.current, "sefer": sefer, "score": score, "time": time_left, "touch": touch_mode,
-		"ferry": [ferry.x, ferry.y, ferry.spd, ferry.simit, ferry.pax.size(), ferry.docked != null] if ferry else [],
-		"vs": [get_viewport_rect().size.x, get_viewport_rect().size.y], "rects": ui.debug_rects(), "fps": Engine.get_frames_per_second(),
-	}
-	JavaScriptBridge.eval("window.__bogaz = " + JSON.stringify(info) + ";", true)
 
 # ================================================================== rendering
 func text_at(c: CanvasItem, pos: Vector2, s: String, size: int, col: Color, outline := 5) -> void:
