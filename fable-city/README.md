@@ -19,7 +19,7 @@ day–night cycle.
 No build step and no install.
 
 - **Locally:** open `index.html` in a recent Chrome or Firefox. An internet connection is needed the first time, because Three.js is loaded from a CDN through an import map.
-- **GitHub Pages:** push this folder to a repository, enable Pages for the branch, and visit the published URL.
+- **GitHub Pages:** https://fatihlabsai.github.io/Claude/fable-city/
 
 Append `?seed=<code>` (the seed shown in the HUD) to the URL to rebuild a specific city.
 

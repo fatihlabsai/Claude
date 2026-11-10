@@ -9,7 +9,7 @@
 ## Açmak
 
 - Yerel: bir HTTP sunucusuyla açın (ör. `python3 -m http.server`). `file://` ile ES modülleri çalışmayabilir.
-- GitHub Pages: https://fatihlabsai.github.io/fable-5-2-simit-tezgahi/
+- GitHub Pages: https://fatihlabsai.github.io/Claude/simit-tezgahi/
 
 ## Planlanan oynanış (kodlanmayı bekliyor)
 
