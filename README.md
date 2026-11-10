@@ -13,6 +13,7 @@ Her klasör bağımsız bir projedir; commit geçmişi korunmuştur. Hepsi tek H
 | [`fable-city/`](./fable-city/) | Claude Fable 5.2 | Prosedürel düşük poligonlu 3B şehir. Trafik, yayalar, gece-gündüz döngüsü; herhangi bir arabaya tıklayıp sürebilirsiniz. | Tamamlandı | [Aç](https://fatihlabsai.github.io/Claude/fable-city/) |
 | [`simit-tezgahi/`](./simit-tezgahi/) | Claude Fable 5.2 | *Boğaz'ın Simitçisi* — Üsküdar sahilinde, tezgâhın arkasından İstanbul'a bakan birinci şahıs simitçilik oyunu. | Devam ediyor: 3B sahne hazır, **oyun döngüsü henüz yazılmadı** | [Aç](https://fatihlabsai.github.io/Claude/simit-tezgahi/) |
 | [`bogaz-vapuru/`](./bogaz-vapuru/) | Claude Opus 5.5 | *Boğaz Vapuru* — iskeleler arasında yolcu taşıdığın, tankerlerden ve akıntıdan kaçıp martılara simit attığın 2D Canvas oyunu. Klavye ve dokunmatik. | Tamamlandı | [Aç](https://fatihlabsai.github.io/Claude/bogaz-vapuru/) |
+| [`bogaz-vapuru-godot/`](./bogaz-vapuru-godot/) | Godot 4.7 | *Boğaz Vapuru*'nun Godot 4 sürümü — yenilenmiş grafikler, su shader'ı, müzik ve sesler; aynı oynanış. Klavye ve dokunmatik joystick. Varlık lisansları `CREDITS.md`'de. | Tamamlandı | [Aç](https://fatihlabsai.github.io/Claude/bogaz-vapuru-godot/) |
 
 ## Yerel olarak açmak
 
