@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1410">
+<title>Boğaz'ın Simitçisi</title>
+<style>
+  :root{
+    --ink:#2a1c12; --paper:#fbf3e2; --paper2:#f3e6cb; --red:#b3261e; --gold:#e3a83a; --green:#2f8f4e;
+    --shadow:0 10px 30px rgba(20,10,0,.35);
+    --sat: env(safe-area-inset-top,0px); --sab: env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1b1410;color:var(--ink);
+    font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+  canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none}
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  .hidden{display:none!important}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;left:0;right:0;top:0;padding:calc(8px + var(--sat)) 10px 0;display:flex;gap:8px;align-items:flex-start;
+    justify-content:space-between;pointer-events:none;z-index:20}
+  .pill{pointer-events:auto;background:rgba(251,243,226,.92);border:1px solid rgba(90,60,30,.25);border-radius:14px;
+    padding:6px 12px;box-shadow:0 4px 14px rgba(20,10,0,.25);backdrop-filter:blur(6px);line-height:1.15}
+  .pill small{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;font-weight:700}
+  .pill b{font-size:18px;font-variant-numeric:tabular-nums}
+  #hudL,#hudR{display:flex;gap:8px;flex-wrap:wrap}
+  #hudR{justify-content:flex-end}
+  #hudC{text-align:center;min-width:120px}
+  #hudC b{font-size:20px}
+  #dayName{font-size:11px;opacity:.75;font-weight:600}
+  #stars{letter-spacing:1px;color:#d08a12;font-size:16px}
+  #stars i{font-style:normal;color:rgba(90,60,30,.25)}
+  .ibtn{pointer-events:auto;width:40px;height:40px;border-radius:12px;background:rgba(251,243,226,.92);
+    border:1px solid rgba(90,60,30,.25);font-size:18px;font-weight:700;box-shadow:0 4px 14px rgba(20,10,0,.25)}
+  .ibtn:hover{background:#fff}
+  .ibtn:active{transform:scale(.94)}
+
+  #ticket{position:fixed;left:10px;top:calc(72px + var(--sat));width:min(230px,46vw);background:var(--paper);
+    border-radius:6px 6px 12px 12px;box-shadow:var(--shadow);padding:10px 12px 12px;z-index:19;pointer-events:none;
+    border-top:6px solid var(--red);transform-origin:top left;transition:transform .25s, opacity .25s}
+  #ticket.flash{animation:flash .7s}
+  @keyframes flash{0%,60%{background:#ffe08a}100%{background:var(--paper)}}
+  #ticket h3{margin:0 0 2px;font-size:14px}
+  #ticket .sub{font-size:11px;opacity:.7;margin-bottom:6px}
+  #ticket ul{list-style:none;margin:0;padding:0}
+  #ticket li{display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:3px 0;border-bottom:1px dashed rgba(90,60,30,.25)}
+  #ticket li:last-child{border-bottom:0}
+  #ticket li.ok{color:var(--green);font-weight:700}
+  #ticket li.over{color:var(--red);font-weight:700}
+  #ticket .tot{margin-top:6px;font-size:12px;display:flex;justify-content:space-between;font-weight:700}
+  #queueInfo{font-size:11px;opacity:.7;margin-top:4px}
+
+  #toast{position:fixed;left:50%;top:calc(74px + var(--sat));transform:translateX(-50%);z-index:25;pointer-events:none;
+    display:flex;flex-direction:column;gap:6px;align-items:center;width:min(92vw,520px)}
+  .toast{background:rgba(42,28,18,.9);color:#fff3d6;padding:8px 14px;border-radius:999px;font-size:14px;font-weight:600;
+    box-shadow:var(--shadow);animation:toastIn .3s ease-out;text-align:center;max-width:100%}
+  .toast.ev{background:linear-gradient(90deg,#b3261e,#d9612a);font-size:15px}
+  .toast.good{background:rgba(35,110,62,.94)}
+  .toast.out{opacity:0;transform:translateY(-8px);transition:all .4s}
+  @keyframes toastIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+
+  /* ---------- world-anchored labels ---------- */
+  #labels{position:fixed;inset:0;pointer-events:none;z-index:10;overflow:hidden}
+  .bubble{position:absolute;left:0;top:0;max-width:min(270px,62vw);background:#fffdf6;border-radius:14px;padding:8px 11px;
+    font-size:14px;line-height:1.25;box-shadow:0 6px 18px rgba(20,10,0,.3);transform-origin:50% 100%;will-change:transform}
+  .bubble:after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-8px;border:8px solid transparent;border-top-color:#fffdf6;border-bottom:0}
+  .bubble .who{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--red);display:block;margin-bottom:2px}
+  .bubble b{color:#8a3a0c}
+  .pbar{position:absolute;left:0;top:0;width:54px;height:7px;border-radius:4px;background:rgba(30,20,10,.55);overflow:hidden;
+    border:1px solid rgba(255,255,255,.6)}
+  .pbar i{display:block;height:100%;width:100%;background:#48b56a;transform-origin:0 50%}
+  .marker{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#e53a2a;color:#fff;
+    font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(229,58,42,.3);
+    animation:pulse .7s infinite alternate}
+  .marker.soft{background:#e3a83a;box-shadow:0 0 0 4px rgba(227,168,58,.3)}
+  @keyframes pulse{from{scale:1}to{scale:1.18}}
+  .float{position:absolute;left:0;top:0;font-weight:900;font-size:20px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45),0 0 10px rgba(0,0,0,.35);
+    white-space:nowrap;animation:floatUp 1.5s ease-out forwards}
+  .float.good{color:#aaf5a0}.float.tip{color:#ffe07a}.float.bad{color:#ff9a8a}
+  @keyframes floatUp{from{opacity:0;margin-top:0}15%{opacity:1}to{opacity:0;margin-top:-70px}}
+  #tip{position:fixed;z-index:30;pointer-events:none;background:rgba(42,28,18,.92);color:#fff3d6;border-radius:8px;padding:5px 9px;font-size:13px;
+    transform:translate(-50%,-140%);white-space:nowrap}
+
+  /* ---------- bottom bars ---------- */
+  #bottom{position:fixed;left:0;right:0;bottom:0;padding:0 8px calc(8px + var(--sab));z-index:22;display:flex;justify-content:center;pointer-events:none}
+  #trayBar,#payBar,#dealBar{pointer-events:auto;background:rgba(251,243,226,.95);border:1px solid rgba(90,60,30,.25);border-radius:16px;
+    box-shadow:var(--shadow);backdrop-filter:blur(6px);max-width:min(760px,100%);width:100%}
+  #trayBar{display:flex;align-items:center;gap:8px;padding:8px}
+  #chips{flex:1;display:flex;gap:6px;flex-wrap:wrap;min-height:38px;align-items:center}
+  #chips .empty{font-size:13px;opacity:.6;padding-left:6px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid rgba(90,60,30,.3);border-radius:999px;padding:6px 10px 6px 8px;
+    font-size:13px;font-weight:600}
+  .chip:hover{border-color:var(--red);color:var(--red)}
+  .chip i{width:12px;height:12px;border-radius:50%;display:inline-block}
+  .chip u{text-decoration:none;opacity:.5;font-weight:900}
+  .btn{border-radius:12px;padding:10px 14px;font-weight:800;font-size:14px;white-space:nowrap;transition:transform .08s, filter .15s}
+  .btn:active{transform:scale(.95)}
+  .btn.pri{background:linear-gradient(#c7372b,#a11f18);color:#fff;box-shadow:0 3px 0 #6e130e}
+  .btn.pri:hover{filter:brightness(1.1)}
+  .btn.sec{background:#e9dcc0;color:var(--ink);box-shadow:0 3px 0 #c5b48f}
+  .btn.sec:hover{filter:brightness(1.04)}
+  .btn.big{font-size:18px;padding:14px 26px;border-radius:14px}
+  .btn[disabled]{opacity:.45;pointer-events:none}
+
+  #payBar{padding:10px}
+  #payTop{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;align-items:center}
+  #payTop b{font-size:16px}
+  #payMath{font-size:22px;font-weight:900;text-align:center;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+  #payMath span{color:var(--red)}
+  #payGiven{text-align:center;font-size:13px;margin-bottom:8px;min-height:18px}
+  #payGiven b{font-size:16px}
+  #payGiven.ok b{color:var(--green)} #payGiven.over b{color:var(--red)}
+  #notes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
+  .note{position:relative;min-width:74px;height:44px;border-radius:6px;color:#fff;font-weight:900;font-size:17px;
+    border:2px solid rgba(255,255,255,.55);box-shadow:0 3px 0 rgba(0,0,0,.3), inset 0 0 0 1px rgba(0,0,0,.15);padding:0 10px;text-shadow:0 1px 0 rgba(0,0,0,.35)}
+  .note small{font-size:10px;opacity:.85;margin-left:2px}
+  .note:hover{filter:brightness(1.12);transform:translateY(-2px)}
+  .note:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+  .note.n100{background:linear-gradient(135deg,#3f78b8,#2a548c)}
+  .note.n50{background:linear-gradient(135deg,#d98a36,#b96a1c)}
+  .note.n20{background:linear-gradient(135deg,#4f9b5c,#35753f)}
+  .note.n10{background:linear-gradient(135deg,#c2534a,#9a322c)}
+  .note.n5{min-width:48px;width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f4dc8a,#b98a22);color:#4a3508;text-shadow:none;border-color:#8a6a1c;padding:0}
+  #payBtns{display:flex;gap:8px;justify-content:center}
+  #dealBar{padding:12px;text-align:center}
+  #dealBar p{margin:0 0 10px;font-size:15px}
+  #dealBar div{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;
+    background:radial-gradient(ellipse at 50% 40%,rgba(30,15,5,.25),rgba(20,10,0,.72))}
+  #title{background:linear-gradient(180deg,rgba(20,10,0,.55),rgba(20,10,0,.05) 38%,rgba(20,10,0,.1) 55%,rgba(20,10,0,.75));
+    flex-direction:column;justify-content:space-between;padding:calc(5vh + var(--sat)) 16px calc(5vh + var(--sab))}
+  #title h1{font-family:Georgia,"Times New Roman",serif;font-size:clamp(38px,8vw,84px);margin:0;color:#fff4dc;text-align:center;
+    text-shadow:0 3px 0 #6e130e,0 10px 30px rgba(0,0,0,.6);letter-spacing:.01em;line-height:1}
+  #title h1 em{font-style:normal;color:#ffc65a}
+  #title .tag{color:#ffe9c2;text-align:center;font-size:clamp(14px,2.2vw,19px);margin-top:10px;text-shadow:0 2px 8px rgba(0,0,0,.7);font-style:italic}
+  #title .foot{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:640px}
+  #title .flavor{color:#fff3d6;text-align:center;font-size:clamp(13px,1.9vw,16px);line-height:1.45;text-shadow:0 2px 8px rgba(0,0,0,.8);margin:0}
+  #title .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  #title .mini{color:#ffe9c2;font-size:12px;opacity:.85;text-decoration:underline;pointer-events:auto}
+  #loadMsg{color:#fff3d6;font-size:14px}
+  .card{background:var(--paper);border-radius:18px;box-shadow:var(--shadow);padding:20px 22px;width:min(540px,100%);max-height:92vh;overflow:auto;
+    border-top:8px solid var(--red);touch-action:pan-y}
+  .card h2{font-family:Georgia,serif;margin:0 0 4px;font-size:26px}
+  .card .sub{opacity:.7;font-size:13px;margin-bottom:12px}
+  .card table{width:100%;border-collapse:collapse;font-size:15px}
+  .card td{padding:6px 2px;border-bottom:1px dashed rgba(90,60,30,.25)}
+  .card td:last-child{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+  .card tr.net td{font-size:18px;border-bottom:0;border-top:2px solid var(--ink)}
+  .verdict{margin:14px 0 6px;padding:12px;border-radius:12px;background:var(--paper2);text-align:center}
+  .verdict b{display:block;font-family:Georgia,serif;font-size:22px;color:var(--red)}
+  .verdict .st{font-size:24px;color:#d08a12;letter-spacing:3px}
+  .next{font-size:13px;line-height:1.4;margin:10px 0 14px;padding-left:10px;border-left:3px solid var(--gold)}
+  .card .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .help ol{margin:8px 0 12px;padding-left:20px;font-size:14px;line-height:1.5}
+  .help .prices{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px 12px;font-size:13px;margin-bottom:12px}
+  .help .prices span{display:flex;justify-content:space-between;border-bottom:1px dotted rgba(90,60,30,.4)}
+
+  @media (max-width:640px){
+    .pill{padding:5px 8px;border-radius:11px}.pill b{font-size:15px}#hudC b{font-size:16px}#hudC{min-width:84px}
+    .ibtn{width:34px;height:34px;font-size:15px;border-radius:10px}
+    #hudR .pill small{display:none}#stars{font-size:13px}
+    #ticket{top:calc(62px + var(--sat));padding:8px 10px;width:min(190px,48vw)}
+    #ticket li{font-size:13px}
+    #toast{top:calc(108px + var(--sat))}
+    .toast{font-size:12.5px}
+    .bubble{font-size:12.5px;padding:6px 9px}
+    .btn{padding:10px 11px;font-size:13px}
+    .note{min-width:58px;height:42px;font-size:15px}
+    #tipPill{display:none}
+  }
+  @media (max-height:520px){
+    #ticket{top:calc(58px + var(--sat))} #payMath{font-size:18px;margin:2px 0} #payGiven{margin-bottom:4px}
+    .note{height:36px} .note.n5{width:40px;height:40px;min-width:40px} #payBar{padding:6px 10px}
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="gl" tabindex="0"></canvas>
+<div id="labels"></div>
+<div id="tip" class="hidden"></div>
+
+<div id="hud" class="hidden">
+  <div id="hudL">
+    <div class="pill"><small>Kasa</small><b id="cash">0 TL</b></div>
+    <div class="pill" id="tipPill"><small>Bahşiş</small><b id="tips">0 TL</b></div>
+  </div>
+  <div class="pill" id="hudC"><b id="clock">07:00</b><div id="dayName">1. Gün</div></div>
+  <div id="hudR">
+    <div class="pill"><small>Esnaf itibarı</small><span id="stars"></span></div>
+    <button class="ibtn" id="btnSound" title="Ses" aria-label="Ses">♪</button>
+    <button class="ibtn" id="btnPause" title="Duraklat" aria-label="Duraklat">Ⅱ</button>
+  </div>
+</div>
+
+<div id="ticket" class="hidden">
+  <h3 id="tkWho">Müşteri</h3>
+  <div class="sub" id="tkSub">Sipariş</div>
+  <ul id="tkList"></ul>
+  <div class="tot"><span>Hesap</span><span id="tkTotal">0 TL</span></div>
+  <div id="queueInfo"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="bottom" class="hidden">
+  <div id="trayBar">
+    <div id="chips"></div>
+    <button class="btn sec" id="btnClear">Temizle</button>
+    <button class="btn pri" id="btnServe">Servis Et</button>
+  </div>
+  <div id="payBar" class="hidden">
+    <div id="payTop"><span>Hesap: <b id="payTotal">0 TL</b></span><span>Müşterinin verdiği: <b id="payTender">0 TL</b></span></div>
+    <div id="payMath"></div>
+    <div id="payGiven"></div>
+    <div id="notes">
+      <button class="note n100" data-v="100">100<small>TL</small></button>
+      <button class="note n50" data-v="50">50<small>TL</small></button>
+      <button class="note n20" data-v="20">20<small>TL</small></button>
+      <button class="note n10" data-v="10">10<small>TL</small></button>
+      <button class="note n5" data-v="5">5</button>
+    </div>
+    <div id="payBtns">
+      <button class="btn sec" id="btnUndo">Geri Al</button>
+      <button class="btn pri" id="btnGive">Para Üstünü Ver</button>
+    </div>
+  </div>
+  <div id="dealBar" class="hidden">
+    <p id="dealText"></p>
+    <div><button class="btn sec" id="btnDealNo">Olmaz, fiyat belli</button><button class="btn pri" id="btnDealYes">Peki, olsun</button></div>
+  </div>
+</div>
+
+<div id="title" class="overlay">
+  <div>
+    <h1>Boğaz'ın <em>Simitçisi</em></h1>
+    <div class="tag">Üsküdar sahilinde bir tezgâh, bir demlik çay, bir şehir dolusu insan.</div>
+  </div>
+  <div class="foot">
+    <p class="flavor">Gün doğarken tezgâhı açtın. Karşında Tarihî Yarımada, Galata Kulesi ve vapurlar…<br>
+      Siparişi tepsiye diz, servis et, para üstünü doğru ver. Martıya simit kaptırma!</p>
+    <div id="loadMsg">Tezgâh kuruluyor…</div>
+    <div class="row">
+      <button class="btn pri big hidden" id="btnStart">Güne Başla</button>
+      <button class="btn sec big hidden" id="btnHow">Nasıl Oynanır?</button>
+    </div>
+    <button class="mini hidden" id="btnReset">Kayıtlı ilerlemeyi sil, 1. günden başla</button>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="card">
+    <h2>Mola</h2>
+    <div class="sub">Çay demini alırken biraz soluklan.</div>
+    <div class="row">
+      <button class="btn pri big" id="btnResume">Devam Et</button>
+      <button class="btn sec big" id="btnHow2">Nasıl Oynanır?</button>
+      <button class="btn sec big" id="btnQuit">Ana Menü</button>
+    </div>
+  </div>
+</div>
+
+<div id="help" class="overlay hidden">
+  <div class="card help">
+    <h2>Nasıl Oynanır?</h2>
+    <ol>
+      <li>Müşteri gelince siparişi sol üstteki <b>fişte</b> görünür.</li>
+      <li>Tezgâhtaki ürünlere <b>tıkla / dokun</b>; ürün tepsiye gider. Yanlış ürünü tepsiden ya da alttaki etiketten kaldır.</li>
+      <li><b>Servis Et</b>'e bas (ya da müşteriye dokun). Müşteri para verir; <b>para üstünü</b> banknotlarla doğru ver.</li>
+      <li>Hızlı ve doğru servis bahşiş ve itibar kazandırır. Bekleyen müşterinin sabır çubuğu kızarırsa çekip gider.</li>
+      <li>Çay bitince <b>semavere</b>, hamur işleri azalınca <b>fırın ziline</b> dokun. Stok biterse kendiliğinden de gelir, ama beklersin.</li>
+      <li>Martıyı kov, kedi Susam'ı sev, zabıta gelince <b>ruhsata</b> dokun, radyoyu aç. Boş yerden sürükleyerek etrafa bakabilirsin.</li>
+    </ol>
+    <div class="prices" id="helpPrices"></div>
+    <div class="row"><button class="btn pri big" id="btnHelpOk">Anladım</button></div>
+  </div>
+</div>
+
+<div id="summary" class="overlay hidden">
+  <div class="card">
+    <h2 id="sumTitle">Gün Sonu</h2>
+    <div class="sub" id="sumSub"></div>
+    <table id="sumTable"></table>
+    <div class="verdict"><div class="st" id="sumStars"></div><b id="sumVerdict"></b><span id="sumFlavor"></span></div>
+    <div class="next" id="sumNext"></div>
+    <div class="row"><button class="btn pri big" id="btnNext">Yeni Güne Başla</button></div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* =====================================================================
+   Boğaz'ın Simitçisi — a first-person Istanbul simit stand game.
+   Everything (geometry, textures, audio) is generated procedurally.
+   ===================================================================== */
+
+// ---------- small helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+const irand = (a, b) => Math.floor(rand(a, b + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+const TL = v => `${Math.round(v)} TL`;
+function seeded(seed) { let s = seed >>> 0; return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- game data ----------
+const PRODUCTS = {
+  simit:   { name: 'Simit',         price: 25, max: 14, dot: '#c98a3c', bakery: true },
+  kasarli: { name: 'Kaşarlı Simit', price: 50, max: 8,  dot: '#f0c330', bakery: true },
+  acma:    { name: 'Açma',          price: 30, max: 8,  dot: '#a8632a', bakery: true },
+  pogaca:  { name: 'Poğaça',        price: 30, max: 8,  dot: '#e0b060', bakery: true },
+  cay:     { name: 'Çay',           price: 20, max: 6,  dot: '#a3200a' },
+  ayran:   { name: 'Ayran',         price: 35, max: 8,  dot: '#f4f6fa' },
+  su:      { name: 'Su',            price: 15, max: 8,  dot: '#7cc4ea' },
+};
+const PIDS = Object.keys(PRODUCTS);
+const orderText = o => PIDS.filter(k => o[k]).map(k => `${o[k]} ${PRODUCTS[k].name.toLocaleLowerCase('tr')}`).join(', ');
+const orderTotal = o => PIDS.reduce((s, k) => s + (o[k] || 0) * PRODUCTS[k].price, 0);
+
+const SKIN = ['#e8b894', '#d9a47c', '#c98f68', '#f0c8a8', '#b97f58'];
+const HAIRC = ['#1d1612', '#2e2018', '#4a3020', '#15110f', '#6b4a2a'];
+
+/* Customer archetypes. patience = seconds at the counter, gen = generosity (tips),
+   exact = chance to pay the exact amount, big = chance to pay with a large note. */
+const TYPES = {
+  ogrenci: {
+    label: 'Öğrenci', patience: 27, gen: .15, exact: .6, big: .05, fickle: .25, bargain: true, voice: 250,
+    menu: [{ simit: [1, 2], cay: [0, 1] }, { simit: [1, 1], ayran: [1, 1] }, { pogaca: [1, 2], cay: [1, 1] }, { simit: [1, 1], su: [1, 1] }],
+    greet: ['Abi vizeye geç kaldım, hızlı bi\' şeyler!', 'Abi para çıkışmıyor ama açız…', 'Sabah dersi var abi, beni bir uyandır.'],
+    wrong: 'Abi bu benim sipariş değil ya!', thanks: ['Eyvallah abi!', 'Kral adamsın abi!'], leave: 'Derse geç kaldım, boş ver abi!',
+    deal: 'Abi çok bekledim, öğrenciyiz… {n} lira indirim yapsan?', change: 'Abi dur dur, {x} olsun!', add: 'Bi\' de çay at abi.',
+    look: () => ({ skin: pick(SKIN), hair: { style: 'short', color: pick(HAIRC) }, top: pick(['#3b6e8f', '#5a6b3a', '#7a3b4a', '#444b57']), bottom: '#2f3e5c', shoes: '#e8e4dc', acc: ['backpack', 'headphones'], accColor: pick(['#b3362b', '#2b6e5a', '#d9a514']) }),
+  },
+  isinsani: {
+    label: 'Beyaz Yakalı', patience: 18, gen: .7, exact: .1, big: .7, fickle: .1, voice: 150,
+    menu: [{ kasarli: [1, 1], cay: [1, 1] }, { simit: [1, 1], cay: [1, 1], su: [0, 1] }, { acma: [1, 2], cay: [1, 2] }, { kasarli: [1, 2], ayran: [1, 1] }],
+    greet: ['Toplantım var, acele edelim lütfen.', 'Hızlı olursa sevinirim, servis bekliyor.', 'Telefondayım… bir saniye… evet, şunları alayım.'],
+    wrong: 'Ben bunu istemedim, dikkat edelim lütfen.', thanks: ['Teşekkürler, iyi işler.', 'Elinize sağlık, hızlısınız.'], leave: 'Vaktim yok, başka yerden alırım!',
+    change: 'Pardon, fikrimi değiştirdim: {x} olsun.', add: 'Bir de çay ekleyin, uyanamadım.',
+    look: () => ({ skin: pick(SKIN), hair: { style: 'short', color: pick(HAIRC) }, top: pick(['#1f2a44', '#2b2b30', '#3a3f4a']), bottom: '#1c2333', shoes: '#1a120c', acc: ['tie', 'briefcase'], accColor: pick(['#a3231c', '#1f5f8a', '#6a2a6a']), face: { glasses: Math.random() < .4 } }),
+  },
+  teyze: {
+    label: 'Teyze', patience: 38, gen: .25, exact: .75, big: .05, fickle: .3, bargain: true, honest: true, voice: 330,
+    menu: [{ pogaca: [2, 3], acma: [1, 2] }, { simit: [2, 3], pogaca: [1, 2] }, { acma: [2, 3], cay: [0, 1] }, { simit: [2, 2], kasarli: [1, 1] }],
+    greet: ['Evladım torunlar gelecek, tazesinden ver.', 'Oğlum eskiden simit bir liraydı, neyse…', 'Yavrum şöyle çıtır çıtır olanlardan seç.'],
+    wrong: 'A-a! Ben bunu demedim ki yavrum.', thanks: ['Allah bereket versin evladım.', 'Elin dert görmesin yavrum.'], leave: 'Dizlerim tutmuyor, bekleyemem evladım.',
+    deal: 'Yavrum çok beklettin, emekliyim ben… {n} lira eksik olsun?', change: 'Dur evladım, şaşırdım: {x} olacaktı.', add: 'Bir de çay koy yavrum, soluklanayım.',
+    look: () => ({ h: .93, wide: 1.15, skin: pick(SKIN), hair: { style: 'scarf', color: pick(['#7a4e6d', '#3f6b6b', '#8a6a3a', '#5b3a3a', '#d8cdb8']) }, top: pick(['#6b5b4b', '#4b5563', '#5a4a5f']), bottom: '#3a3330', shoes: '#2a1f18', coat: true, acc: ['bag'], accColor: pick(['#c0563a', '#3a7a5a', '#2f5f9a']), face: { female: true, old: true } }),
+  },
+  turist: {
+    label: 'Turist', patience: 36, gen: .85, exact: .05, big: .6, fickle: .45, voice: 210,
+    menu: [{ simit: [1, 2], cay: [1, 2] }, { kasarli: [1, 1], ayran: [1, 1] }, { simit: [1, 1], pogaca: [1, 1], su: [1, 2] }, { acma: [1, 1], cay: [1, 1], su: [1, 1] }],
+    greet: ['Merhaba! Ben çok aç. Lütfen:', 'Hello— şey, selam! Simit çok güzel, yes?', 'Bir… iki… nasıl denir? Bunu istiyorum:'],
+    wrong: 'No no, yanlış! Bu değil, arkadaş.', thanks: ['Çok teşekkür! Very lezzetli!', 'Harika! İstanbul çok güzel!'], leave: 'Sorry, tur otobüs gidiyor! Güle güle!',
+    change: 'Ah, pardon! {x} istiyorum, please.', add: 'Ve bir Turkish çay, lütfen!',
+    look: () => ({ h: 1.04, skin: pick(['#f2cdb0', '#f6d6bd', '#e9b999']), hair: { style: 'sunhat', color: '#d9c48a' }, top: pick(['#e2a23b', '#3fa7a0', '#e8734a', '#f0f0e8']), bottom: '#b9a67a', shoes: '#7a5a3a', shorts: true, shortSleeve: true, acc: ['camera'], face: { glasses: 'sun', hairColor: '#c9a35a' } }),
+  },
+  balikci: {
+    label: 'Balıkçı', patience: 34, gen: .4, exact: .65, big: .05, fickle: .1, voice: 120,
+    menu: [{ simit: [2, 2], cay: [1, 1] }, { simit: [1, 2], cay: [1, 2] }, { pogaca: [1, 1], cay: [2, 2] }, { simit: [1, 1], ayran: [1, 1] }],
+    greet: ['Rastgele de bana usta, bugün lüfer var.', 'Sabahtan beri oltadayım, karnım zil çalıyor.', 'Usta, balık vurmadı ama simit vurur.'],
+    wrong: 'Yanlış oltaya takılmış bu usta!', thanks: ['Eyvallah usta, rastgele!', 'Bereketli olsun usta.'], leave: 'Balık kaçıyor usta, ben de kaçtım!',
+    change: 'Usta dur, {x} yap sen onu.', add: 'Bir çay daha koy, hava serin.',
+    look: () => ({ wide: 1.08, skin: pick(['#c98f68', '#b97f58']), hair: { style: 'beanie', color: pick(['#1f2f4a', '#3a2a22', '#4a4a4a']) }, top: '#d9a514', bottom: '#3a4034', shoes: '#22281f', acc: ['rod'], face: { moustache: true, hairColor: '#3a3028' } }),
+  },
+  cocuk: {
+    label: 'Çocuk', patience: 28, gen: 0, exact: .2, big: .5, fickle: .2, voice: 480, strictChange: true,
+    menu: [{ simit: [2, 3] }, { simit: [1, 2], ayran: [1, 1] }, { pogaca: [1, 2], su: [1, 1] }, { acma: [2, 2], simit: [1, 1] }],
+    greet: ['Amca, annem bunları al dedi:', 'Amca amca! En büyüğünden ver!', 'Para üstünü unutma amca, annem sayıyor!'],
+    wrong: 'Amcaa, bu yanlış! Annem kızar!', thanks: ['Sağ ol amca!', 'Yaşasııın!'], leave: 'Annem çağırıyor, ben gidiyorum!',
+    change: 'Amca yanlış söyledim, {x} olacak!', add: 'Amca bir de ayran… şey, çay! Babama.',
+    look: () => ({ h: .66, skin: pick(SKIN), hair: { style: 'cap', color: pick(['#2f5f9a', '#c0392b', '#2f8f4e']) }, top: pick(['#d9453a', '#f0b429', '#3f8fd0']), bottom: '#3a4a6a', shoes: '#f0f0f0', shorts: true, shortSleeve: true, acc: [], face: { hairColor: pick(HAIRC) } }),
+  },
+  taksici: {
+    label: 'Taksici', patience: 18, gen: .45, exact: .3, big: .3, fickle: .1, bargain: true, voice: 135,
+    menu: [{ simit: [1, 1], cay: [1, 1] }, { kasarli: [1, 1], cay: [1, 1] }, { simit: [2, 2], su: [1, 1] }, { pogaca: [1, 2], cay: [1, 1] }],
+    greet: ['Usta taksi çift park, çabuk!', 'Köprü yine kilit, bari karnımız doysun.', 'Müşteri arabada bekliyor, taksimetre açık usta!'],
+    wrong: 'Usta yanlış adrese geldik, bu değil!', thanks: ['Eyvallah usta, yolun açık olsun!', 'Hadi kolay gelsin usta.'], leave: 'Çekici geldi! Kaçtım ben usta!',
+    deal: 'Usta beklettin, taksimetre yazdı; {n} lira düşersin artık?', change: 'Usta rotayı değiştir: {x} olsun.', add: 'Bir de çay koy, uykum var.',
+    look: () => ({ wide: 1.14, belly: true, skin: pick(['#c98f68', '#d9a47c']), hair: { style: Math.random() < .5 ? 'bald' : 'short', color: '#2a2018' }, top: pick(['#8a3b2e', '#3a5a7a', '#6a6a4a']), bottom: '#2a2a2e', shoes: '#1a1410', acc: ['vest'], accColor: '#23201e', face: { moustache: true, hairColor: '#1d1612' } }),
+  },
+  yolcu: {
+    label: 'Vapur Yolcusu', patience: 20, gen: .5, exact: .35, big: .3, fickle: .15, voice: 290,
+    menu: [{ simit: [1, 2], cay: [1, 1] }, { simit: [2, 3] }, { acma: [1, 1], cay: [1, 1] }, { pogaca: [1, 1], simit: [1, 1], su: [1, 1] }],
+    greet: ['Vapur kalkıyor, iki dakikam var!', 'Karşıya geçiyorum, vapurda yerim.', 'Martılara da atacağım birazını, sar şunları:'],
+    wrong: 'Bu değildi, vapuru kaçıracağım!', thanks: ['Sağ olun, iyi günler!', 'Tam vaktinde, teşekkürler!'], leave: 'Vapur kaçtı sayenizde… neyse!',
+    change: 'Yok yok, {x} alayım ben.', add: 'Vapurda içerim, bir çay da verin.',
+    look: () => ({ h: .97, skin: pick(SKIN), hair: { style: 'long', color: pick(HAIRC) }, top: pick(['#c9b38a', '#7a8a9a', '#8a4a4a', '#3f5a4a']), bottom: '#2a2a33', shoes: '#3a2a22', coat: true, acc: ['scarf', 'newspaper'], accColor: pick(['#b3362b', '#e0c070', '#3f6b8a']), face: { female: true } }),
+  },
+  muzisyen: {
+    label: 'Sokak Müzisyeni', patience: 32, gen: .2, exact: .8, big: 0, fickle: .2, voice: 180,
+    menu: [{ simit: [1, 1], cay: [1, 1] }, { acma: [1, 1], cay: [1, 1] }, { simit: [1, 2], su: [1, 1] }],
+    greet: ['Usta, bugün karın tokluğuna çalıyoruz.', 'Bir türkü patlatmadan önce yakıt lazım.', 'Akordum tamam, midem bozuk usta.'],
+    wrong: 'Bu nota yanlış usta, sipariş böyle değildi.', thanks: ['Sağ ol usta, bu türkü sana gelsin!'], leave: 'Sahne beni bekler usta, kaçtım.',
+    change: 'Usta makam değişti: {x} olsun.', add: 'Bir çay da koy, ses açılsın.',
+    look: () => ({ skin: pick(SKIN), hair: { style: 'beanie', color: pick(['#7a2a2a', '#2f4a3a', '#444']), long: true }, top: '#4a6a8a', bottom: '#2a2a2a', shoes: '#4a3020', acc: ['guitar'], face: { beard: true, hairColor: '#2e2018' } }),
+  },
+  taraftar: {
+    label: 'Taraftar', patience: 20, gen: .35, exact: .6, big: .1, fickle: 0, voice: 160,
+    menu: [{ simit: [1, 2], ayran: [1, 1] }, { simit: [2, 2], su: [1, 1] }, { kasarli: [1, 1], ayran: [1, 1] }, { simit: [1, 1], cay: [1, 1] }],
+    greet: ['Maç çıkışı kurt gibi açız usta!', 'Şampiyon biziz usta! Ver bakalım şunları!', 'Sesim kısıldı bağırmaktan, bir şeyler ver usta!'],
+    wrong: 'Hakem! Bu sipariş ofsayt usta!', thanks: ['Eyvallah usta, en büyük sensin!', 'Oley oley, sağ ol usta!'], leave: 'Tribün beni çağırıyor, hadi eyvallah!',
+    look: () => ({ skin: pick(SKIN), hair: { style: 'short', color: pick(HAIRC) }, top: '#e8771f', bottom: '#27324a', shoes: '#e8e4dc', shortSleeve: true, acc: ['scarf'], accColor: '#1f2f6a', face: { moustache: Math.random() < .3, hairColor: '#1d1612' } }),
+  },
+  hasan: {
+    label: 'Hasan Amca', patience: 32, gen: .6, exact: .7, big: 0, fickle: 0, honest: true, voice: 110,
+    menu: [{ simit: [1, 1], cay: [1, 1] }],
+    greet: ['Her zamankinden, usta.'], wrong: 'Unuttun mu beni usta? Her sabah aynısını alırım.', thanks: ['Helal, unutmamışsın. Hadi hayırlı işler.'], leave: 'Bugün de kısmet değilmiş usta…',
+    look: () => ({ h: .96, skin: '#d9a47c', hair: { style: 'kasket', color: '#5a5148' }, top: '#6a4a32', bottom: '#4a4038', shoes: '#2a1f18', acc: ['vest'], accColor: '#3f3a34', face: { moustache: true, old: true, hairColor: '#b8b4ac' } }),
+  },
+  zabita: {
+    label: 'Zabıta', patience: 26, gen: 0, exact: 1, big: 0, fickle: 0, voice: 125,
+    menu: [{ cay: [1, 1] }],
+    greet: ['Zabıta! Ruhsatı görelim usta.'], wrong: 'Ben çay dedim usta, rüşvet değil.', thanks: ['Her şey usulüne uygun. Kolay gelsin.'], leave: 'Ruhsat yok ha? Yazıyorum cezayı.',
+    look: () => ({ wide: 1.06, skin: '#d9a47c', hair: { style: 'officer', color: '#1f2a44' }, top: '#27344f', bottom: '#1c2333', shoes: '#111', acc: ['stripe'], accColor: '#c8e03a', face: { moustache: true, hairColor: '#1d1612' } }),
+  },
+  askida: {
+    label: 'Yolcu', patience: 30, gen: 0, exact: 1, big: 0, fickle: 0, voice: 200,
+    menu: [{ simit: [1, 1] }],
+    greet: ['Usta… askıda simit var mı acaba?'], wrong: 'Yok usta, bir simit yeter bana.', thanks: ['Allah razı olsun usta, eksik olma.'], leave: 'Neyse usta, sağlık olsun…',
+    look: () => ({ h: .98, skin: pick(SKIN), hair: { style: 'beanie', color: '#5a5a55' }, top: '#6f6a5c', bottom: '#4a463e', shoes: '#3a2a22', coat: true, acc: [], face: { beard: true, old: true, hairColor: '#8a8680' } }),
+  },
+};
+Object.keys(TYPES).forEach(k => TYPES[k].id = k);
+const WEEK = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+// ---------- persistent save ----------
+const SAVE_KEY = 'bogazinSimitcisi.v1';
+let save = { day: 1, rep: 50, best: 0, askida: 0, usual: null, usualKnown: false };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && typeof s.day === 'number') save = Object.assign(save, s); } catch (e) { /* storage unavailable */ }
+const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
+
+/* =====================================================================
+   AUDIO — all sounds synthesised with Web Audio
+   ===================================================================== */
+const Audio_ = (() => {
+  let ctx = null, master = null, noiseBuf = null, muted = false;
+  let seaGain = null, rainGain = null, radioOn = false, sazUntil = 0, nextBeat = 0, beatIdx = 0;
+  const HICAZ = [293.66, 311.13, 369.99, 392.0, 440.0, 466.16, 523.25, 587.33];
+  const TUNE = [0, 2, 3, 4, 3, 2, 1, 0, 3, 4, 5, 4, 3, 2, 3, -1, 4, 5, 7, 5, 4, 3, 2, 3, 1, 2, 3, 2, 1, 0, 0, -1];
+  function init() {
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = muted ? 0 : .8; master.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // sea wash
+    seaGain = loopNoise(420, 'lowpass', .05);
+    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = .13; lg.gain.value = .025; lfo.connect(lg); lg.connect(seaGain.gain); lfo.start();
+    rainGain = loopNoise(5200, 'highpass', 0);
+  }
+  function loopNoise(freq, type, gain) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = ctx.createGain(); g.gain.value = gain; src.connect(f); f.connect(g); g.connect(master); src.start(); return g;
+  }
+  function tone(freq, dur, { type = 'sine', vol = .2, slide = 0, delay = 0, attack = .005 } = {}) {
+    if (!ctx) return; const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .05);
+  }
+  function burst(dur, freq, vol, delay = 0, type = 'bandpass') {
+    if (!ctx) return; const t = ctx.currentTime + delay;
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = 1.2;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+    s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random()); s.stop(t + dur + .05);
+  }
+  function pluck(freq, vol, delay = 0, bright = 2200) {
+    if (!ctx) return; const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = freq; o2.frequency.value = freq * 2.003;
+    f.type = 'lowpass'; f.frequency.setValueAtTime(bright, t); f.frequency.exponentialRampToValueAtTime(380, t + .35); f.Q.value = 3;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .004); g.gain.exponentialRampToValueAtTime(.0005, t + .5);
+    const g2 = ctx.createGain(); g2.gain.value = .25; o.connect(f); o2.connect(g2); g2.connect(f); f.connect(g); g.connect(master);
+    o.start(t); o2.start(t); o.stop(t + .55); o2.stop(t + .55);
+  }
+  return {
+    init,
+    get muted() { return muted; },
+    toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : .8; return muted; },
+    pop(p = 1) { tone(520 * p, .09, { type: 'triangle', vol: .16, slide: 260 }); },
+    remove() { tone(420, .1, { type: 'triangle', vol: .12, slide: -200 }); },
+    error() { tone(160, .22, { type: 'sawtooth', vol: .1, slide: -50 }); tone(120, .25, { type: 'square', vol: .05, delay: .05 }); },
+    coin() { tone(2100, .25, { vol: .1 }); tone(3150, .3, { vol: .07, delay: .04 }); tone(2640, .2, { vol: .05, delay: .09 }); },
+    note() { burst(.07, 3200, .08); },
+    kaching() { burst(.05, 2500, .12); tone(1320, .5, { vol: .12, delay: .06 }); tone(1980, .6, { vol: .1, delay: .12 }); burst(.12, 900, .08, .02); },
+    bell() { tone(1760, 1.1, { vol: .14 }); tone(3520, .7, { vol: .05 }); tone(2637, .9, { vol: .04, delay: .01 }); },
+    horn() { [0, .9].forEach(d => { tone(147, 1.5, { type: 'sawtooth', vol: .09, delay: d, attack: .08 }); tone(110, 1.5, { type: 'sawtooth', vol: .09, delay: d, attack: .08 }); tone(220.5, 1.5, { type: 'triangle', vol: .05, delay: d, attack: .1 }); }); },
+    gull(v = .08) { for (let i = 0; i < 3; i++) { tone(1500 + rand(200), .22, { type: 'sawtooth', vol: v * .5, slide: -600, delay: i * .26 }); tone(2300, .2, { type: 'triangle', vol: v * .5, slide: -900, delay: i * .26 }); } },
+    meow() { tone(620, .45, { type: 'triangle', vol: .12, slide: 240, attack: .06 }); tone(1240, .4, { type: 'sine', vol: .04, slide: 400, attack: .06 }); },
+    purr() { for (let i = 0; i < 14; i++) burst(.04, 160, .09, i * .055, 'lowpass'); },
+    whistle() { tone(1900, .16, { vol: .1, slide: 600 }); tone(2500, .3, { vol: .1, delay: .17, slide: -300 }); },
+    cheer() { for (let i = 0; i < 6; i++) tone(rand(280, 520), .35, { type: 'sawtooth', vol: .025, delay: rand(.25), slide: rand(-60, 80), attack: .05 }); burst(.5, 1400, .05); },
+    pour() { burst(.9, 2600, .05); tone(700, .9, { vol: .03, slide: 500 }); },
+    voice(base = 200, n = 5) { for (let i = 0; i < n; i++) tone(base * rand(.85, 1.3), .075, { type: 'triangle', vol: .06, delay: i * .085, slide: rand(-30, 30), attack: .012 }); },
+    setRain(a) { if (rainGain) rainGain.gain.setTargetAtTime(a * .09, ctx.currentTime, .6); },
+    setRadio(on) { radioOn = on; if (ctx) nextBeat = ctx.currentTime + .1; },
+    playSaz(sec) { if (ctx) { sazUntil = ctx.currentTime + sec; nextBeat = Math.max(nextBeat, ctx.currentTime + .1); } },
+    get radio() { return radioOn; },
+    update(active) {
+      if (!ctx) return;
+      const saz = ctx.currentTime < sazUntil;
+      if (!(radioOn || saz) || !active) { nextBeat = ctx.currentTime + .1; return; }
+      while (nextBeat < ctx.currentTime + .15) {
+        const n = TUNE[beatIdx % TUNE.length], d = nextBeat - ctx.currentTime;
+        if (n >= 0) {
+          if (saz) { pluck(HICAZ[n], .1, d, 2600); pluck(HICAZ[0] / 2, .04, d, 900); }
+          else { pluck(HICAZ[n] * (beatIdx % 64 < 32 ? 1 : 1.498), .035, d, 1300); if (beatIdx % 4 === 0) burst(.05, 300, .03, d, 'lowpass'); }
+        }
+        beatIdx++; nextBeat += saz ? .21 : .26;
+      }
+    },
+  };
+})();
+
+//@@NEXT@@
+</script>
+</body>
+</html>

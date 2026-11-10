@@ -1,0 +1,93 @@
+Create TWO files in the current directory:
+
+1) index.html — a fully self-contained, playable browser game
+2) README.md — a short polished README
+
+Do not ask questions. Write both files completely. When done, confirm the file names and approximate line counts.
+
+STRICT CONSTRAINTS:
+- index.html must be ONE self-contained file. No other JS/CSS/image/audio/font files.
+- You MAY load Three.js from a CDN via an ES module import map (three and official addons only). No other external dependencies or assets. All geometry, materials, textures (if any), and audio must be procedural / generated in code (CanvasTexture, procedural geometries, Web Audio oscillators if needed).
+- Must run with no console errors in a modern browser (Chrome/Firefox).
+- Aim for smooth performance on a mid-range laptop (keep draw calls and geometry reasonable; use InstancedMesh where helpful; no heavy post-processing stacks).
+- Write polished, production-quality code. No placeholders, no TODOs, no broken features, no "coming soon".
+- All visible game UI text, buttons, dialogue, product names, HUD labels, and summaries MUST be in Turkish. Code comments may be in English.
+- Works with mouse. Also support touch (tap to select items / serve / press buttons) so it is playable on a phone or tablet. Pointer events recommended.
+- Responsive full-viewport canvas. Readable UI on both desktop and mobile.
+
+GAME FANTASY AND POINT OF VIEW:
+- The player is a simitçi standing BEHIND a classic Istanbul street simit cart / tezgah (wooden-metal street cart with a glass or open display, tea setup, cash box).
+- FIRST-PERSON (or tight over-the-shoulder) camera from behind the stand, looking OUT over the counter toward the street and the city. The cart and products occupy the foreground; the player's "workspace" is the counter. The camera should feel planted behind the tezgah — not an orbiting god camera, not a third-person avatar walking around. A very slight idle sway is fine; do not let the player freely fly the camera during play. A look-around with limited mouse-drag / touch-drag can be allowed but keep the stand in frame.
+- Art direction: REALISTIC, not cartoon, not low-poly cute. Believable materials (wood grain, brushed metal, glass, sesame on bread, porcelain, water, fabric), physically plausible lighting, atmosphere, soft fog or haze, sunlight, gentle contact shadows if affordable. Aim for a warm, photographic Istanbul street mood (golden morning or bright late-morning light is ideal; a day cycle is welcome if it stays beautiful).
+
+ISTANBUL BACKGROUND (must be recognizable, not a generic city):
+Build a convincing Istanbul backdrop visible beyond the stand and the immediate street, all procedural:
+- The Bosphorus: water with reflections, gentle waves or shimmer, a sense of depth and atmosphere
+- At least one iconic mosque silhouette with dome(s) and minarets (e.g. a Yeni Cami / Süleymaniye / general historic peninsula feel)
+- Galata Tower (or a clearly readable Galata-like tower) on the skyline
+- Layered skyline: apartment blocks, roofs, maybe a distant bridge suggestion
+- Ferries moving slowly on the water
+- Seagulls in the air (animated)
+- Immediate street atmosphere in front of the cart: pavement/cobble, maybe a tram or passing traffic in the distance, other pedestrians walking by who are not always customers, Turkish flags or a simple awning/tree if it helps the scene
+- Sky with believable daylight (sun, soft clouds or haze)
+
+THE STAND AND PRODUCTS:
+Model a detailed, attractive tezgah in the foreground. Products must be visually distinct and clickable/tappable. Include at least:
+- Simit (sesame ring) — staple item
+- Kaşarlı simit
+- Açma
+- Poğaça
+- Çay in classic Turkish tulip glasses (ince belli), with visible tea color and optional steam
+- Ayran
+- Su (water bottles)
+Assign clear prices in Turkish Lira (TL), shown on the stand (small price tags or a menu board) and in the UI. Use plausible 2026 street prices (you may choose exact numbers; keep them consistent). The stand should also have a visible cash box / till, a serving area / tepsi, and a tea kettle or semaver-like setup. Stock should be visible (piles of simit etc.). If stock can run low during a busy rush, even better — but never soft-lock the player; restock automatically or via a clear action.
+
+CUSTOMERS:
+A variety of distinct Istanbul characters, each with a unique look (body proportions, clothes, hair, accessories — readable at a glance), unique Turkish spoken lines (short, natural, slightly funny or characterful), typical orders, patience, and payment behavior. Include at least these types (you may add more):
+- Student
+- Businessman / office worker
+- Anneanne / teyze (grandma)
+- Tourist (may speak broken Turkish or a mix; still show Turkish UI around them)
+- Fisherman / esnaf type
+- Child (with a parent, or buying for family)
+- Maybe a taxi driver, a ferry commuter, a street musician, etc.
+
+Customers walk up to the stand, wait in a small visible queue if needed, order, wait, pay, then leave. Patience is visible (a subtle meter or body language / color). Some customers:
+- Tip generously if served fast and correctly
+- Bargain or complain if slow or wrong
+- Change their mind, add a çay, or order for a friend
+Wrong items, long waits, or incorrect change should reduce satisfaction, tips, and possibly cause a walk-away. Correct, fast service should feel rewarding.
+
+GAMEPLAY LOOP:
+This is a complete, fun, replayable shift-management game, not a tech demo.
+1) Start / title screen: strong title (you may name the game; something evoking an Istanbul simit stand is good), short flavor text, a "Güne Başla" (or similar) button, optional short how-to-play. Looks like part of the same world (show the scene behind or a cinematic camera on the stand).
+2) A game day / shift begins. Customers arrive with increasing frequency and slightly harder orders as the day goes on.
+3) The player selects products on the stand (click/tap) to assemble the current order, can cancel/remove a wrong item, then serves the customer. Payment: the customer tenders cash (sometimes not exact); the player must give correct change via a simple, usable cash/change UI (bills and coins, or a clear numeric pad — it must be obvious and playable, not fiddly). If you invent a smoother payment interaction that still involves money and change, that is fine as long as it is clear.
+4) Earn money (ciro / kasa). Track a visible cash total, a satisfaction or reputation hint, and the time of day.
+5) HUD (clean, readable, Turkish, not blocking the view of Istanbul): money, time of day, current customer order, maybe a short queue indicator, maybe today's tip total. Selected items for the current order should be obvious.
+6) End-of-day / end-of-shift summary: money earned, customers served, mistakes, tips, a short flavor verdict (e.g. "Usta simitçi" vs "Yarın daha iyi olur"), and a button to play another day (difficulty or starting conditions may persist or escalate — your choice, but explain it).
+7) Days can get harder (more customers, combo orders, impatient people, a sudden rush). Always remain fair and understandable.
+
+YOUR OWN CREATIVE INTERPRETATION (REQUIRED):
+Add your own original twists, mechanics, events, and atmosphere — do not only implement the list above. Invent a few memorable ideas that make this feel like a authored game set in Istanbul (examples of the *kind* of thing, not a mandatory list: a sudden seagull stealing a simit, a ferry horn, a sudden rain shower and people huddling at the stand, a regular who always orders the same thing, a power cut, a wedding convoy, a football-match crowd rush, a radio playing, a cat living under the cart, a health-inspector or zabıta moment, golden-hour lighting change, etc.). You choose. Make them delightful, readable, and integrated — not random interruptions that break play.
+
+List every original addition clearly in README.md under a section titled exactly:
+
+## Fable'ın yorumu
+
+CONTROLS AND UX:
+- Mouse click / tap on products, customers (if useful), bills/coins, and UI buttons.
+- Clear hover/press feedback on interactive objects (highlight, cursor change).
+- Keyboard shortcuts are optional extras, not required to play.
+- Pause or a small help/menu button is welcome.
+- No unskippable long intros. The first playable action should be one click from the title screen.
+
+README.md:
+- Project name, one-paragraph description in Turkish (a short English sentence is optional).
+- How to open: open index.html locally, or GitHub Pages.
+- Controls.
+- Products and basic rules.
+- The required section "## Fable'ın yorumu" listing your original additions.
+- Credit: generated by Claude Fable 5.2.
+
+Output the complete contents of both files. Do not omit code. Do not ask questions.
