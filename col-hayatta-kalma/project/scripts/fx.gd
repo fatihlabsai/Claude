@@ -31,11 +31,14 @@ static func amount(base: int) -> int:
 
 static var _flame_shader: Shader
 
+static var _flame_body: Shader
+
 static func flame_mat(particle: bool, inten: float, sd := 0.0) -> ShaderMaterial:
 	if _flame_shader == null:
 		_flame_shader = load("res://shaders/flame.gdshader")
+		_flame_body = load("res://shaders/flame_body.gdshader")
 	var m := ShaderMaterial.new()
-	m.shader = _flame_shader
+	m.shader = _flame_shader if particle else _flame_body
 	m.set_shader_parameter("particle", particle)
 	m.set_shader_parameter("intensity", inten)
 	m.set_shader_parameter("seed", sd)
@@ -52,7 +55,7 @@ static func fire(parent: Node3D) -> Node3D:
 		var body := MeshInstance3D.new()
 		body.name = "Body%d" % k
 		var q := QuadMesh.new(); q.size = Vector2(1.25, 1.9) * (1.0 - k * 0.3)
-		q.material = flame_mat(false, 1.0 if k == 0 else 1.2, k * 0.37)
+		q.material = flame_mat(false, 1.25 if k == 0 else 1.45, k * 0.37)
 		body.mesh = q
 		body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		body.position = Vector3(0.05 * k, 0.88 - k * 0.2, 0)
@@ -60,7 +63,7 @@ static func fire(parent: Node3D) -> Node3D:
 	var fl := CPUParticles3D.new()
 	fl.name = "Flames"
 	fl.amount = amount(14); fl.lifetime = 0.9
-	var fq := QuadMesh.new(); fq.size = Vector2(0.55, 0.8); fq.material = flame_mat(true, 0.9)
+	var fq := QuadMesh.new(); fq.size = Vector2(0.55, 0.8); fq.material = flame_mat(true, 0.45)
 	fl.mesh = fq
 	fl.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; fl.emission_sphere_radius = 0.22
 	fl.direction = Vector3.UP; fl.spread = 12.0
@@ -114,7 +117,7 @@ static func fire(parent: Node3D) -> Node3D:
 	l.set_script(load("res://scripts/fire_flicker.gd"))
 	l.name = "Light"
 	l.light_color = Color(1.0, 0.58, 0.26)
-	l.light_energy = 2.2
+	l.light_energy = 1.8
 	l.omni_range = 11.0
 	l.omni_attenuation = 1.2
 	l.position.y = 1.0

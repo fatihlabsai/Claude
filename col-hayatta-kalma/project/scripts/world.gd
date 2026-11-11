@@ -4,7 +4,7 @@
 class_name World
 extends Node3D
 
-const REG := 4                 # regions per side for MultiMesh culling
+const REG := 8                 # regions per side for MultiMesh culling
 const GRID := 8.0              # spatial hash cell (m)
 
 var g: WorldGen
@@ -44,6 +44,12 @@ static func pbr(n: String, tint := Color(1, 1, 1), scale := 0.5, rough := 1.0) -
 	m.uv1_world_triplanar = true
 	m.uv1_scale = Vector3.ONE * scale
 	_pbr_cache[key] = m
+	return m
+
+func painted(c: Color) -> StandardMaterial3D:
+	var m: StandardMaterial3D = pbr("metal", Color(1, 1, 1), 0.45).duplicate()
+	m.albedo_texture = null
+	m.albedo_color = c
 	return m
 
 ## Overrides every mesh under n with mat.
@@ -99,7 +105,13 @@ func _biome_weights(p: Vector2, h: float) -> Color:
 	var shade := clampf(0.5 + (h - 3.0) * 0.08, 0.0, 1.0)
 	return Color(rf, sf * (1.0 - rf), of * (1.0 - rf), shade)
 
+var small_mmi: Array = []
+var _small_range := 70.0
 func set_quality(hq: bool) -> void:
+	_small_range = 70.0 if hq else 48.0
+	for mmi in small_mmi:
+		if is_instance_valid(mmi):
+			mmi.visibility_range_end = _small_range
 	if _chunk_mat:
 		_chunk_mat.set_shader_parameter("hq", hq)
 
@@ -246,9 +258,10 @@ func _build_wreck() -> void:
 	root.position = Vector3(0, ground(Vector2.ZERO), 0)
 	root.rotation.y = 0.5
 	add_child(root)
-	var white := pbr("metal", Color(1.5, 1.5, 1.45), 0.45)
-	var red := pbr("metal", Color(1.3, 0.38, 0.3), 0.45)
-	var grey := pbr("metal", Color(0.8, 0.82, 0.86), 0.6)
+	# painted aluminium: flat paint colour, panel seams/dents from the metal plate normal + roughness maps
+	var white := painted(Color("#e9ebe8"))
+	var red := painted(Color("#c8402f"))
+	var grey := pbr("metal", Color(1.0, 1.0, 1.0), 0.6)
 	var glass := _mat(Color("#2d4a63"), 0.2)
 	# fuselage (tilted cylinder) + nose + tail
 	var fus := MeshInstance3D.new()
@@ -335,6 +348,11 @@ func _build_ruin(i: int) -> void:
 	var ch := Models.instance("survival/chest"); ch.scale = Vector3.ONE * 3.0; ch.position = Vector3(1.5, 0, 0.6); ch.rotation.y = 0.3; root.add_child(ch)
 	var chest_p := c + Vector2(1.5, 0.6).rotated(-root.rotation.y)
 	inter.append({"kind": "chest", "id": "ruin:%d" % i, "p": chest_p, "r": 2.2, "label": "Eski sandığı aç", "node": ch})
+	# a dead quiver tree (Poly Haven scan) next to the temple
+	var tree := Models.instance("ph/dead_quiver_trunk")
+	tree.scale = Vector3.ONE * 1.8; tree.position = Vector3(-6.5, -0.1, -4.0); tree.rotation.y = 0.8
+	root.add_child(tree)
+	_obstacle(c + Vector2(-6.5, -4.0).rotated(-root.rotation.y), 0.5)
 	shades.append([c, 5.5])
 	shelters.append([c, 5.0, "Harabe"])
 
@@ -504,7 +522,8 @@ func _flush_mm() -> void:
 			mmi.multimesh = mm
 			# small props fade out early (cheap LOD); big rocks/palms stay to the fog line
 			if e.mesh.get_aabb().size.length() < 1.5 and not key.begins_with("proc/"):
-				mmi.visibility_range_end = 70.0
+				small_mmi.append(mmi)
+				mmi.visibility_range_end = _small_range
 				mmi.visibility_range_end_margin = 8.0
 				mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 			add_child(mmi)

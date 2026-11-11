@@ -19,7 +19,8 @@ void fragment() {
 	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
 	ALBEDO = mix(deep, shallow, 0.35 + 0.25 * w) * mix(0.35, 1.0, day);
 	EMISSION = sky_col * fres * 0.6 * mix(0.25, 1.0, day);
-	ROUGHNESS = 0.12;
+	// glossy by day; at night the moon highlight is kept faint (bright specks bloomed on WebGL)
+	ROUGHNESS = mix(0.45, 0.12, day);
 	METALLIC = 0.0;
-	SPECULAR = 0.5;
+	SPECULAR = mix(0.04, 0.5, day);
 }

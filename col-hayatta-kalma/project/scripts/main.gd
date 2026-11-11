@@ -230,6 +230,9 @@ func _apply_quality() -> void:
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality == 2 else DirectionalLight3D.SHADOW_ORTHOGONAL
 	sun.shadow_blur = 1.6 if Settings.quality == 2 else 1.0
 	env.glow_enabled = Settings.quality >= 1
+	# low-lying height haze in basins (Orta/Yüksek)
+	env.fog_height = 0.5
+	env.fog_height_density = 0.06 if Settings.quality >= 1 else 0.0
 	dust_fx.visible = Settings.quality >= 1
 	dust_fx.amount = 40 if Settings.quality == 1 else 70
 	if world:
@@ -268,6 +271,7 @@ func _generate(sd: int) -> void:
 	player.move(Vector2.ZERO, false, 1.0, 0.0, false)
 	_make_map_base()
 	loading.visible = false
+	_apply_quality()
 	world_ready = true
 
 func _make_map_base() -> void:
@@ -577,12 +581,12 @@ func _update_sky(_dt: float) -> void:
 		var edge := 1.0 - clampf(ss * 1.6, 0.0, 1.0)
 		sky = day_sky.lerp(dusk, edge * 0.7)
 		amb_col = Color(1.0, 0.92, 0.82).lerp(Color(1.0, 0.7, 0.55), edge)
-		amb_e = lerpf(0.36, 0.5, ss)
+		amb_e = lerpf(0.44, 0.52, ss)
 		var el := deg_to_rad(lerpf(8.0, 68.0, ss))
 		var az := lerpf(-1.4, 1.4, tod / GameData.DAY_PART)
 		sun.rotation = Vector3(-el, az + PI, 0)
 		sun.light_color = Color(1.0, 0.96, 0.9).lerp(Color(1.0, 0.62, 0.38), edge)
-		sun.light_energy = lerpf(0.35, 1.05, ss)
+		sun.light_energy = lerpf(0.5, 1.05, ss)
 	else:
 		var nt := (tod - GameData.DAY_PART) / (GameData.DAY_LEN - GameData.DAY_PART)
 		var fade := clampf(minf(nt, 1.0 - nt) * 6.0, 0.0, 1.0)
@@ -649,8 +653,8 @@ func _title_cam(dt: float) -> void:
 	tod = fmod(150.0 + _title_t * 2.0, GameData.DAY_LEN)
 	var a := _title_t * 0.06
 	var c := Vector3(0, g.height(0, 0), 0)
-	cam.position = c + Vector3(cos(a) * 22.0, 11.0, sin(a) * 22.0)
-	cam.look_at(c + Vector3(0, 1.5, 0), Vector3.UP)
+	cam.position = c + Vector3(cos(a) * 22.0, 7.5, sin(a) * 22.0)
+	cam.look_at(c + Vector3(0, 3.2, 0), Vector3.UP)
 	cam.keep_aspect = Camera3D.KEEP_HEIGHT if get_viewport().get_visible_rect().size.x > get_viewport().get_visible_rect().size.y else Camera3D.KEEP_WIDTH
 	_update_sky(dt)
 	cam_pos = Vector3.ZERO
@@ -1127,7 +1131,7 @@ func _update_fires(dt: float, night: bool) -> void:
 				if it.left > 0.0:
 					it.left -= dt
 					var l: OmniLight3D = it.fx.get_node("Light")
-					l.set("base", 2.2 * clampf(it.left / (GameData.FIRE_TIME * 0.2), 0.45, 1.0))
+					l.set("base", 1.8 * clampf(it.left / (GameData.FIRE_TIME * 0.2), 0.45, 1.0))
 					if storm and world.sheltered(it.p) == "":
 						it.left = 0.0
 						if player.pos.distance_to(it.p) < 40.0:

@@ -22,6 +22,10 @@ static func register() -> void:
 	_leaf.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_leaf.roughness = 0.75
 	_leaf.backlight_enabled = false
+	# fronds right in front of the camera dissolve (dither, no blending) so they never hide the player
+	_leaf.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_DITHER
+	_leaf.distance_fade_min_distance = 5.0
+	_leaf.distance_fade_max_distance = 8.5
 	_plant = StandardMaterial3D.new()
 	_plant.vertex_color_use_as_albedo = true
 	_plant.roughness = 0.68
@@ -132,11 +136,11 @@ static func saguaro(h: float, arms: int, sd: int) -> ArrayMesh:
 	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var base := Color(0.2, 0.36, 0.17); var ridge := Color(0.42, 0.52, 0.3)
 	var path := []; var radii := []
-	for i in 13:
-		var t := i / 12.0
+	for i in 9:
+		var t := i / 8.0
 		path.append(Vector3(0, t * h, 0))
 		radii.append(0.2 * (1.0 - pow(t, 6.0) * 0.35))
-	_tube(st, path, radii, 24, 12, 0.07, base, ridge, 1.0)
+	_tube(st, path, radii, 16, 8, 0.08, base, ridge, 1.0)
 	for k in arms:
 		var a := rng.randf() * TAU if k == 0 else a_prev(k, rng)
 		var d := Vector3(cos(a), 0, sin(a))
@@ -148,7 +152,7 @@ static func saguaro(h: float, arms: int, sd: int) -> ArrayMesh:
 			var up := maxf(0.0, t - 0.3) * h * 0.55
 			ap.append(Vector3(0, y0 + up + sin(minf(t * 2.2, 1.0) * PI / 2) * 0.15, 0) + d * (out + 0.0))
 			ar.append(0.13 * (1.0 - pow(t, 5.0) * 0.3))
-		_tube(st, ap, ar, 16, 10, 0.07, base, ridge, 1.0)
+		_tube(st, ap, ar, 10, 5, 0.08, base, ridge, 1.0)
 	st.generate_normals()
 	var m := st.commit()
 	m.surface_set_material(0, _plant)
@@ -159,7 +163,7 @@ static func a_prev(k: int, rng: RandomNumberGenerator) -> float:
 
 # ---------------------------------------------------------------- prickly pear
 static func _pad(st: SurfaceTool, xf: Transform3D, w: float, hh: float, col: Color) -> void:
-	var sm := SphereMesh.new(); sm.radius = 0.5; sm.height = 1.0; sm.radial_segments = 10; sm.rings = 6
+	var sm := SphereMesh.new(); sm.radius = 0.5; sm.height = 1.0; sm.radial_segments = 8; sm.rings = 4
 	var arr := sm.get_mesh_arrays()
 	var vs: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
 	var ns: PackedVector3Array = arr[Mesh.ARRAY_NORMAL]

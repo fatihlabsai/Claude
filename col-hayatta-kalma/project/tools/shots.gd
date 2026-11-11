@@ -35,6 +35,39 @@ func _run() -> void:
 	for sc in scenes:
 		if sc == "title":
 			continue
+		if sc.begins_with("q") and sc.length() == 2:
+			Settings.quality = int(sc.substr(1)); Settings.changed.emit()
+			continue
+		if sc == "mmstats":
+			for key in m.world._mm:
+				var e: Dictionary = m.world._mm[key]
+				var cnt := 0
+				for r in e.x: cnt += r.size()
+				var tris := 0
+				for si in e.mesh.get_surface_count():
+					var a: Array = e.mesh.surface_get_arrays(si)
+					tris += (a[Mesh.ARRAY_INDEX].size() if a[Mesh.ARRAY_INDEX] != null else a[Mesh.ARRAY_VERTEX].size()) / 3
+				print("FPS MM ", key, " n=", cnt, " tris=", tris, " total=", cnt * tris)
+			continue
+		if sc == "nosky":
+			m.env.background_mode = Environment.BG_COLOR; continue
+		if sc == "nomm":
+			for c in m.world.get_children():
+				if c is MultiMeshInstance3D: c.visible = false
+			continue
+		if sc == "noterrain":
+			for c in m.world.get_children():
+				if c is MeshInstance3D and c.material_override == m.world._chunk_mat: c.visible = false
+			continue
+		if sc == "nofx":
+			m.dust_fx.visible = false; m.haze_rect.visible = false; continue
+		if sc.begins_with("fps"):
+			m.t_abs = 110.0; m.player.pos = Vector2(8, 9)
+			await wait(3.0)
+			var f0 := Engine.get_process_frames(); var t0 := Time.get_ticks_msec()
+			await wait(5.0)
+			print("FPS ", sc, " ", (Engine.get_process_frames() - f0) * 1000.0 / (Time.get_ticks_msec() - t0))
+			continue
 		m.weather._plan(m.t_abs + 9999.0)
 		var name: String = sc
 		m.zoom = 1.0
@@ -47,7 +80,7 @@ func _run() -> void:
 			"oasis":
 				m.t_abs = 150.0; m._test_cmd("goto:oasis:20")
 			"night":
-				m.t_abs = 345.0; m._test_cmd("goto:oasis:20")
+				m.t_abs = 345.0; m._test_cmd("goto:oasis:24")
 				m.add_item("odun", 3); m.add_item("tas", 2)
 				m.craft(GameData.RECIPES[0])
 			"storm":

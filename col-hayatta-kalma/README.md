@@ -3,9 +3,9 @@
 Küçük uçağın çölün ortasına düştü. Elinde yarım bir matara, birkaç konserve ve enkazdan çıkanlar var. Su bul, gölgede kal, geceyi ateşin başında geçir ve kum fırtınalarından korun. Kurtulmanın iki yolu var: telsizi onarıp helikopter çağırmak ya da çölün öbür ucundaki kervansaraya yürümek.
 
 **Oyna:** https://fatihlabsai.github.io/Claude/col-hayatta-kalma/
-**Bilgisayara indir (Windows / Linux / macOS):** https://github.com/fatihlabsai/Claude/releases/tag/col-hayatta-kalma-v1.0
+**Bilgisayara indir (Windows / Linux / macOS):** https://github.com/fatihlabsai/Claude/releases/tag/col-hayatta-kalma-v1.1
 
-Godot 4.7 (GL Compatibility) ile yapıldı. 3D low-poly, sabit 3/4 kamera. Web sürümü tek iş parçacıklıdır, özel sunucu başlığı gerekmez.
+Godot 4.7 (GL Compatibility) ile yapıldı. v1.1'den beri stilize-gerçekçi görünüm (PBR dokular, Poly Haven taramaları, prosedürel gökyüzü ve alev), sabit 3/4 kamera. Web sürümü tek iş parçacıklıdır, özel sunucu başlığı gerekmez.
 
 ## Ekran görüntüleri
 | | |
@@ -15,6 +15,23 @@ Godot 4.7 (GL Compatibility) ile yapıldı. 3D low-poly, sabit 3/4 kamera. Web s
 | ![Harita](screenshots/map.png) | ![Çanta ve üretim](screenshots/inventory-craft.png) |
 
 Mobil: [screenshots/mobile.png](screenshots/mobile.png), [screenshots/mobile-inventory.png](screenshots/mobile-inventory.png)
+
+v1.0 ile karşılaştırma: [screenshots/compare-v1.0-v1.1.png](screenshots/compare-v1.0-v1.1.png) · eski görüntüler `screenshots/before-v1.0/`, yeniler `screenshots/after-v1.1/`.
+
+## Sürüm notları
+
+### v1.1 — görsel yenileme
+- **Görünüm:** Low-poly yerine stilize-gerçekçi stil. Arazi artık Poly Haven PBR dokularıyla (albedo + normal + pürüzlülük) çiziliyor: kum dalgacıklı normal haritası ve güneşte hafif ışıltı, kayalık yamaçlarda triplanar kaya, tuz düzlükleri, vaha çamuru; biyomlar arasında yumuşak geçiş.
+- **Modeller:** Taşlar, kayalar, kuru çalılar, sukulentler, vaha bitkileri, kamp ateşi taşları, enkaz kasası ve varilleri Poly Haven 3D taramalarıyla değişti (web için üçgen sayısı azaltıldı). Palmiye, saguaro kaktüsü ve frenk inciri kodla üretilen yeni modeller. Harabe, kervansaray, mağara, kuyu ve uçak enkazı PBR malzemelerle kaplandı.
+- **Karakter:** Kenney "Animated Characters Survivors" (CC0) modeli: daha insan oranlı, iskeletli; yürüme/koşma/durma animasyonları, saldırı/toplama/etkileşim hareketleri kodla.
+- **Işık ve atmosfer:** Prosedürel gökyüzü (gündüz güneş diski, gece yıldızlar ve ay), ACES ton eşleme, hafif parlama (glow), derinlik + yükseklik sisi, öğle sıcağında ısı dalgası, havada uçuşan toz, Yüksek'te iki kademeli yumuşak gölgeler.
+- **Ateş:** Gerçekçi alev: shader ile çizilen titreşen alev gövdesi, alev dilleri, köz kıvılcımları, duman ve titreyen ışık. (WebGL'deki yeşil alev hatasına yol açan renk rampaları/vertex renkleri kullanılmıyor.)
+- **Grafik kalitesi:** Ağır efektler kaliteye bağlı: Düşük'te normal haritaları, triplanar kaya, ışıltı, glow, ısı dalgası, toz ve gölgeler kapalı; küçük süs bitkileri daha erken gizlenir.
+- **Düzeltmeler:** Mobil dikey ekranda puslu ufuk görünmüyor (kamera dikey ekranda daha dik); "KUM FIRTINASI!" bandı alttaki yazıların üstüne binmiyor ve dar ekranda sığıyor; haritadaki "Kapat" düğmesi kahverengi; fırtına sisi kameranın uzaklığına göre ayarlanıyor (dikey ekranda oyuncu görünür kalıyor).
+- Oyun kuralları ve denge değişmedi (denge simülasyonu aynı sonucu veriyor).
+
+### v1.0
+- İlk sürüm.
 
 ## Nasıl oynanır
 - **Hedef:** Hayatta kal. Skor = gün sayısı + keşif yüzdesi.
@@ -29,7 +46,7 @@ Mobil: [screenshots/mobile.png](screenshots/mobile.png), [screenshots/mobile-inv
 - **Zorluk:** Kolay / Normal / Zor (tüketim ×0.75 / ×1 / ×1.3).
 - **İlk gün ipuçları:** Matara ile su içme, gölgeye girme, ateş kurup kullanma ve fırtına için konuşma balonları çıkar.
 - **Kayıt:** Her yeni günün şafağında otomatik kaydedilir (web'de tarayıcının yerel deposuna). Ana menüde **Devam Et** ile kaldığın yerden, öldüğünde **Son şafaktan devam** ile o günün başından sürdürürsün. Duraklat menüsünde "Kaydet ve Ana Menü" de var.
-- **Grafik kalitesi (Ayarlar):** Düşük / Orta / Yüksek: gölgeler, parçacık miktarı, çözünürlük ölçeği ve görüş mesafesi. Dokunmatik cihazlarda varsayılan Düşük, bilgisayarda Orta.
+- **Grafik kalitesi (Ayarlar):** Düşük / Orta / Yüksek: gölgeler, parçacık miktarı, çözünürlük ölçeği, görüş mesafesi; Orta/Yüksek'te ayrıca normal haritaları, kum ışıltısı, glow, ısı dalgası ve toz. Dokunmatik cihazlarda varsayılan Düşük, bilgisayarda Orta.
 
 ## Kontroller
 | Klavye / fare | Dokunmatik |
@@ -49,6 +66,9 @@ Mobil: [screenshots/mobile.png](screenshots/mobile.png), [screenshots/mobile-inv
   - `scripts/survival.gd`, `weather.gd`, `world_gen.gd`: oyun ve denge simülasyonunun paylaştığı kurallar
   - `tools/balance_sim.gd`: başsız denge simülasyonu
   - `tools/smoke.gd`: başsız duman testi
+  - `tools/shots.gd`: geliştirici aracı, sahneleri PNG olarak kaydeder (`godot -- --shots /tmp/out day,night`)
+  - `scripts/flora.gd`: prosedürel palmiye / kaktüs / frenk inciri
+  - `shaders/terrain.gdshader`, `sky.gdshader`, `flame*.gdshader`, `heat_haze.gdshader`: arazi, gökyüzü, alev, ısı dalgası
 - `screenshots/`: ekran görüntüleri
 - `CREDITS.md`: tüm varlıklar ve lisansları (hepsi CC0, fontlar OFL)
 
