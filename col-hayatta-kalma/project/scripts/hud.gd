@@ -194,19 +194,30 @@ func _draw() -> void:
 	if game.in_shade and not night: st.append(["Gölgedesin", Color("#ffe7b8")])
 	if game.near_fire: st.append(["Ateşin yanındasın", Color("#ffb347")])
 	if game.shelter_name != "" and game.storm_state != "": st.append(["Sığınaktasın: " + game.shelter_name, Color("#b8f0b8")])
+	# --- storm banner (drawn first so the status lines can sit below it) ---
+	var banner_bottom := 0.0
+	if game.storm_state == "warn" or game.storm_state == "storm":
+		var warn: bool = game.storm_state == "warn"
+		var msg: String = ("KUM FIRTINASI YAKLAŞIYOR · %d sn · Sığınak bul!" % ceili(game.storm_eta)) if warn else "KUM FIRTINASI!"
+		var bw2 := minf(460.0 if warn else 300.0, vs.x - 24.0)
+		var fs := 18 if warn else 20
+		while fs > 11 and UiKit.head_font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > bw2 - 24.0:
+			fs -= 1
+		var by := 60.0 if not touch else 64.0
+		var br := Rect2(Vector2(vs.x / 2 - bw2 / 2, by), Vector2(bw2, 34))
+		if warn:
+			draw_style_box(UiKit.flat_box(Color(0.75, 0.32, 0.1, 0.85), 10, 2, Color("#ffd27a")), br)
+		else:
+			draw_style_box(UiKit.flat_box(Color(0.6, 0.25, 0.08, 0.85), 10), br)
+		_text(Vector2(vs.x / 2, by + 17 + fs * 0.36), msg, fs, Color.WHITE, true)
+		rects["storm_banner"] = br
+		banner_bottom = br.end.y
 	var yy := 96.0 if not touch else 300.0
+	# status lines never overlap the banner (baseline + ascent below its bottom edge)
+	yy = maxf(yy, banner_bottom + 26.0)
 	for i in st.size():
 		_text(Vector2(vs.x / 2, yy + i * 24), st[i][0], 18, st[i][1], true, true, 5)
-	# --- storm banner ---
-	if game.storm_state == "warn":
-		var eta: float = game.storm_eta
-		var br := Rect2(Vector2(vs.x / 2 - 230, 60), Vector2(460, 34))
-		draw_style_box(UiKit.flat_box(Color(0.75, 0.32, 0.1, 0.85), 10, 2, Color("#ffd27a")), br)
-		_text(br.position + Vector2(230, 25), "KUM FIRTINASI YAKLAŞIYOR · %d sn · Sığınak bul!" % ceili(eta), 18, Color.WHITE, true)
-	elif game.storm_state == "storm":
-		var br2 := Rect2(Vector2(vs.x / 2 - 150, 60), Vector2(300, 34))
-		draw_style_box(UiKit.flat_box(Color(0.6, 0.25, 0.08, 0.85), 10), br2)
-		_text(br2.position + Vector2(150, 25), "KUM FIRTINASI!", 20, Color.WHITE, true)
+		rects["status%d" % i] = Rect2(Vector2(vs.x / 2 - 120, yy + i * 24 - 18), Vector2(240, 24))
 	# --- interaction prompt ---
 	if game.prompt != "":
 		var py := vs.y - (90.0 if not touch else 250.0)

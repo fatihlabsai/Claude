@@ -95,7 +95,10 @@ func _draw() -> void:
 	var cr := Rect2(Vector2(vs.x / 2 - 70, map_rect.end.y + 52), Vector2(140, 44))
 	if cr.end.y > vs.y - 4:
 		cr.position.y = vs.y - 50
-	draw_style_box(UiKit.tex_box("button_brown", 12), cr)
+	# solid brown button (the textured one read as light beige on top of the map)
+	var cb := UiKit.flat_box(Color("#7a4a22"), 12, 2, Color("#f4d39b"))
+	cb.shadow_color = Color(0, 0, 0, 0.35); cb.shadow_size = 4; cb.shadow_offset = Vector2(0, 2)
+	draw_style_box(cb, cr)
 	_t(cr.get_center() + Vector2(0, 8), "Kapat", 22, Color("#fff4dc"))
 	rects["close"] = cr
 	rects["mapview"] = map_rect

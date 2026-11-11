@@ -10,6 +10,9 @@ const SAVE := "user://save.json"
 const FOG := 150
 
 # --- scene ---
+var sky_mat: ShaderMaterial
+var dust_fx: CPUParticles3D
+var haze_rect: ColorRect
 var env: Environment
 var sun: DirectionalLight3D
 var cam: Camera3D
@@ -94,6 +97,8 @@ func _ready() -> void:
 	_show_title()
 	if "--smoke" in OS.get_cmdline_user_args():
 		add_child(load("res://tools/smoke.gd").new())
+	if "--shots" in OS.get_cmdline_user_args():
+		add_child(load("res://tools/shots.gd").new())
 
 func _random_seed() -> int:
 	return int(Time.get_unix_time_from_system()) % 1000000 + randi() % 1000
@@ -116,18 +121,29 @@ func _setup_input() -> void:
 func _setup_scene() -> void:
 	var we := WorldEnvironment.new()
 	env = Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#f5d7a1")
+	env.background_mode = Environment.BG_SKY
+	sky_mat = ShaderMaterial.new(); sky_mat.shader = load("res://shaders/sky.gdshader")
+	var sky_res := Sky.new(); sky_res.sky_material = sky_mat
+	sky_res.radiance_size = Sky.RADIANCE_SIZE_32
+	env.sky = sky_res
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	# no radiance-map reflections: cheap on WebGL; water fakes its sky reflection
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	env.ambient_light_color = Color(1.0, 0.9, 0.8)
 	env.ambient_light_energy = 0.6
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.05
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 1.0
+	env.tonemap_white = 6.0
+	env.glow_intensity = 0.35
+	env.glow_strength = 0.9
+	env.glow_bloom = 0.04
+	env.glow_hdr_threshold = 1.1
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 	env.fog_enabled = true
 	env.fog_light_color = Color("#f2d2a0")
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_depth_curve = 1.6
-	env.fog_sky_affect = 1.0
+	env.fog_sky_affect = 0.45
 	we.environment = env
 	add_child(we)
 	sun = DirectionalLight3D.new()
@@ -154,9 +170,29 @@ func _setup_scene() -> void:
 	sand_fx.spread = 8.0
 	sand_fx.emitting = false
 	add_child(sand_fx)
+	# drifting dust motes around the player (Orta/Yüksek)
+	dust_fx = CPUParticles3D.new()
+	dust_fx.amount = 60
+	dust_fx.lifetime = 5.0
+	dust_fx.preprocess = 5.0
+	dust_fx.mesh = Fx.billboard("light_01", Color(1.0, 0.9, 0.72, 0.5), true, 0.07)
+	dust_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	dust_fx.emission_box_extents = Vector3(12, 2.5, 12)
+	dust_fx.gravity = Vector3(0.25, 0.02, 0.1)
+	dust_fx.initial_velocity_min = 0.1; dust_fx.initial_velocity_max = 0.5
+	dust_fx.spread = 180.0
+	dust_fx.scale_amount_min = 0.5; dust_fx.scale_amount_max = 1.4
+	add_child(dust_fx)
 	# UI layers
 	ui = CanvasLayer.new()
 	add_child(ui)
+	haze_rect = ColorRect.new()
+	haze_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	haze_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hm := ShaderMaterial.new(); hm.shader = load("res://shaders/heat_haze.gdshader")
+	haze_rect.material = hm
+	haze_rect.visible = false
+	ui.add_child(haze_rect)
 	vig_rect = ColorRect.new()
 	vig_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	vig_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -191,6 +227,13 @@ func _apply_quality() -> void:
 	var q := Settings.q()
 	sun.shadow_enabled = q.shadows
 	sun.directional_shadow_max_distance = 30.0 if Settings.quality == 1 else 50.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality == 2 else DirectionalLight3D.SHADOW_ORTHOGONAL
+	sun.shadow_blur = 1.6 if Settings.quality == 2 else 1.0
+	env.glow_enabled = Settings.quality >= 1
+	dust_fx.visible = Settings.quality >= 1
+	dust_fx.amount = 40 if Settings.quality == 1 else 70
+	if world:
+		world.set_quality(Settings.quality >= 1)
 	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	get_viewport().scaling_3d_scale = q.scale
 	cam.far = q.far + 20.0
@@ -265,7 +308,7 @@ func _reset_state(diff: int) -> void:
 	fog = PackedByteArray(); fog.resize(FOG * FOG)
 	weather = Weather.new()
 	weather.setup(seed_v)
-	player.dead = false
+	player.revive()
 	player.pos = Vector2(3.5, 4.5)
 	player.set_spear(false)
 
@@ -550,15 +593,37 @@ func _update_sky(_dt: float) -> void:
 		sun.light_color = Color(0.62, 0.72, 1.0)
 		sun.light_energy = lerpf(0.4, 0.2, fade)
 	var storm_col := Color("#d39a5c")
-	env.background_color = sky.lerp(storm_col, storm_k)
+	# sky shader: zenith deepens to blue at midday, burns orange at the edges of the day, stars at night
+	var nf := 0.0
+	if night:
+		var nt2 := (tod - GameData.DAY_PART) / (GameData.DAY_LEN - GameData.DAY_PART)
+		nf = clampf(minf(nt2, 1.0 - nt2) * 6.0, 0.0, 1.0)
+	var top := Color("#3f78c4").lerp(Color("#6d86b8"), 1.0 - clampf(ss * 1.6, 0.0, 1.0)) if not night else Color("#2a3352").lerp(Color("#050914"), nf)
+	sky_mat.set_shader_parameter("top_col", top.lerp(storm_col, storm_k))
+	sky_mat.set_shader_parameter("horizon_col", sky.lerp(storm_col, storm_k))
+	sky_mat.set_shader_parameter("ground_col", sky.darkened(0.15).lerp(storm_col, storm_k))
+	sky_mat.set_shader_parameter("night", 1.0 if night else 0.0)
+	sky_mat.set_shader_parameter("storm", storm_k)
+	if world:
+		world._chunk_mat.set_shader_parameter("sparkle", 0.0 if night else ss * (1.0 - storm_k))
+		world.water_mat.set_shader_parameter("sky_col", top.lerp(sky, 0.4).lerp(storm_col, storm_k))
+		world.water_mat.set_shader_parameter("day", 0.0 if night else clampf(ss * 2.0, 0.3, 1.0))
+	var hz := (haze_rect.material as ShaderMaterial)
+	var haze_k := 0.0 if night or Settings.quality == 0 or not playing else clampf((ss - 0.5) * 2.0, 0.0, 1.0) * (1.0 - storm_k)
+	haze_rect.visible = haze_k > 0.02
+	hz.set_shader_parameter("amount", haze_k)
+	dust_fx.position = (player.position if player else Vector3.ZERO) + Vector3(0, 1.5, 0)
+	dust_fx.emitting = not night and storm_k < 0.3
 	env.ambient_light_color = amb_col.lerp(Color(1.0, 0.8, 0.6), storm_k * 0.6)
 	env.ambient_light_energy = amb_e + storm_k * 0.15
 	env.fog_light_color = sky.lerp(storm_col, storm_k)
 	# depth fog hides the draw-distance edge; the storm pulls it right up to the player
 	var far_f: float = q.far
 	var sheltered_k := 1.6 if shelter_name != "" else 1.0
-	env.fog_depth_end = lerpf(far_f, 30.0 * sheltered_k, storm_k)
-	env.fog_depth_begin = lerpf(far_f * 0.45, 13.0, storm_k)
+	# the storm fog is measured from the camera, whose distance changes with zoom/portrait
+	var cd := cam.position.distance_to(player.position) if player and playing else 22.0
+	env.fog_depth_end = lerpf(far_f, cd + 14.0 * sheltered_k, storm_k)
+	env.fog_depth_begin = lerpf(far_f * 0.45, maxf(cd - 9.0, 4.0), storm_k)
 	env.fog_density = lerpf(1.0, 0.92, storm_k)
 	sun.light_energy *= 1.0 - storm_k * 0.55
 
@@ -566,7 +631,8 @@ func _update_camera(dt: float) -> void:
 	var vs := get_viewport().get_visible_rect().size
 	var portrait := vs.y > vs.x
 	var z := zoom * (1.35 if portrait else 1.0)
-	var off := Vector3(0, 13.0, 10.0) * z
+	# portrait: steeper so the top of the tall frame stays on the ground instead of a hazy horizon
+	var off := (Vector3(0, 15.5, 6.5) if portrait else Vector3(0, 13.0, 10.0)) * z
 	var tgt := player.position + Vector3(0, 0.8, 0)
 	var want := tgt + off
 	cam_pos = want if cam_pos == Vector3.ZERO else cam_pos.lerp(want, minf(1.0, dt * 6.0))
@@ -1061,7 +1127,7 @@ func _update_fires(dt: float, night: bool) -> void:
 				if it.left > 0.0:
 					it.left -= dt
 					var l: OmniLight3D = it.fx.get_node("Light")
-					l.light_energy = 2.0 + sin(t_abs * 13.0) * 0.25 + sin(t_abs * 7.3) * 0.2
+					l.set("base", 2.2 * clampf(it.left / (GameData.FIRE_TIME * 0.2), 0.45, 1.0))
 					if storm and world.sheltered(it.p) == "":
 						it.left = 0.0
 						if player.pos.distance_to(it.p) < 40.0:

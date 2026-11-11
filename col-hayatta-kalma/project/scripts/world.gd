@@ -18,15 +18,46 @@ var crates: Array = []         # post-storm crates
 var wells_b: Array = []        # buckets per well
 var opened := {}               # "ruin:2" -> true
 var water_nodes: Array = []
+var water_mat: ShaderMaterial
 var smoke: CPUParticles3D
 var _mm := {}                  # key -> {mesh, xforms:[region][], mmi:[region]}
 var _chunk_mat: ShaderMaterial
 var stone_mat := StandardMaterial3D.new()
 var dark_mat := StandardMaterial3D.new()
+var rock_mat: StandardMaterial3D
+
+static var _pbr_cache := {}
+## Triplanar PBR material from assets/pbr/<n> (Poly Haven, CC0). scale = repeats per metre.
+static func pbr(n: String, tint := Color(1, 1, 1), scale := 0.5, rough := 1.0) -> StandardMaterial3D:
+	var key := n + str(tint) + str(scale)
+	if _pbr_cache.has(key):
+		return _pbr_cache[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = load("res://assets/pbr/%s/albedo.jpg" % n)
+	m.albedo_color = tint
+	m.normal_enabled = true
+	m.normal_texture = load("res://assets/pbr/%s/normal.jpg" % n)
+	m.roughness_texture = load("res://assets/pbr/%s/arm.jpg" % n)
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+	m.roughness = rough
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE * scale
+	_pbr_cache[key] = m
+	return m
+
+## Overrides every mesh under n with mat.
+static func skin(n: Node, mat: Material) -> void:
+	if n is MeshInstance3D:
+		(n as MeshInstance3D).material_override = mat
+	for c in n.get_children():
+		skin(c, mat)
 
 func build(gen: WorldGen) -> void:
 	g = gen
-	stone_mat.albedo_color = Color("#d8aa72"); stone_mat.roughness = 0.9
+	Flora.register()
+	stone_mat = pbr("clay", Color(1.0, 0.8, 0.64), 0.5)
+	rock_mat = pbr("rock", Color(0.95, 0.8, 0.7), 0.3)
 	dark_mat.albedo_color = Color("#2b1d14")
 	_build_terrain()
 	_build_water()
@@ -60,17 +91,32 @@ func _biome_color(p: Vector2, h: float) -> Color:
 	c = c.darkened(clampf(0.08 - h * 0.012, -0.06, 0.12))
 	return c
 
+## Terrain shader layer weights: r = rock, g = salt flat, b = oasis mud, a = dune light/shade.
+func _biome_weights(p: Vector2, h: float) -> Color:
+	var rf := smoothstep(0.35, 0.7, g.rock_factor(p))
+	var sf := smoothstep(0.4, 0.75, g.salt_factor(p))
+	var of := smoothstep(0.25, 0.75, g.oasis_factor(p))
+	var shade := clampf(0.5 + (h - 3.0) * 0.08, 0.0, 1.0)
+	return Color(rf, sf * (1.0 - rf), of * (1.0 - rf), shade)
+
+func set_quality(hq: bool) -> void:
+	if _chunk_mat:
+		_chunk_mat.set_shader_parameter("hq", hq)
+
 func _build_terrain() -> void:
-	var sh := load("res://shaders/sand.gdshader")
 	_chunk_mat = ShaderMaterial.new()
-	_chunk_mat.shader = sh
+	_chunk_mat.shader = load("res://shaders/terrain.gdshader")
+	for pair in [["sand_alb", "sand/albedo"], ["sand_nrm", "sand/normal"], ["sand2_alb", "sand2/albedo"],
+			["rock_alb", "rock/albedo"], ["rock_nrm", "rock/normal"], ["rock_arm", "rock/arm"],
+			["salt_alb", "salt/albedo"], ["salt_nrm", "salt/normal"], ["mud_alb", "mud/albedo"], ["mud_nrm", "mud/normal"]]:
+		_chunk_mat.set_shader_parameter(pair[0], load("res://assets/pbr/%s.jpg" % pair[1]))
 	var per := 30
 	var chunks := int((WorldGen.N - 1) / per)
 	var colors := PackedColorArray(); colors.resize(WorldGen.N * WorldGen.N)
 	for j in WorldGen.N:
 		for i in WorldGen.N:
 			var p := Vector2(-WorldGen.HALF + i * WorldGen.CELL, -WorldGen.HALF + j * WorldGen.CELL)
-			colors[j * WorldGen.N + i] = _biome_color(p, g.heights[j * WorldGen.N + i])
+			colors[j * WorldGen.N + i] = _biome_weights(p, g.heights[j * WorldGen.N + i])
 	for cj in chunks:
 		for ci in chunks:
 			var st := SurfaceTool.new()
@@ -98,15 +144,19 @@ func _build_terrain() -> void:
 			add_child(mi)
 	# a huge flat sand skirt beyond the map edge so the horizon is never empty
 	var skirt := MeshInstance3D.new()
-	var pm := PlaneMesh.new(); pm.size = Vector2(2400, 2400)
-	skirt.mesh = pm
+	var sst := SurfaceTool.new(); sst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	sst.set_color(Color(0, 0, 0, 0.45)); sst.set_normal(Vector3.UP)
+	for v in [Vector3(-1200, 0, -1200), Vector3(1200, 0, -1200), Vector3(1200, 0, 1200),
+			Vector3(-1200, 0, -1200), Vector3(1200, 0, 1200), Vector3(-1200, 0, 1200)]:
+		sst.add_vertex(v)
+	skirt.mesh = sst.commit()
 	skirt.position.y = -2.6   # below every basin so it only shows past the map edge
-	var sm := StandardMaterial3D.new(); sm.albedo_color = Color("#e9b46c"); sm.roughness = 1.0
-	skirt.material_override = sm
+	skirt.material_override = _chunk_mat
 	add_child(skirt)
 
 func _build_water() -> void:
 	var wm := ShaderMaterial.new(); wm.shader = load("res://shaders/water.gdshader")
+	water_mat = wm
 	for o in g.oases:
 		var mi := MeshInstance3D.new()
 		var cm := CylinderMesh.new(); cm.top_radius = 17.0; cm.bottom_radius = 17.0; cm.height = 0.2; cm.radial_segments = 40
@@ -196,9 +246,9 @@ func _build_wreck() -> void:
 	root.position = Vector3(0, ground(Vector2.ZERO), 0)
 	root.rotation.y = 0.5
 	add_child(root)
-	var white := _mat(Color("#eef0f2"), 0.5)
-	var red := _mat(Color("#d9483b"), 0.5)
-	var grey := _mat(Color("#7d848c"), 0.6)
+	var white := pbr("metal", Color(1.5, 1.5, 1.45), 0.45)
+	var red := pbr("metal", Color(1.3, 0.38, 0.3), 0.45)
+	var grey := pbr("metal", Color(0.8, 0.82, 0.86), 0.6)
 	var glass := _mat(Color("#2d4a63"), 0.2)
 	# fuselage (tilted cylinder) + nose + tail
 	var fus := MeshInstance3D.new()
@@ -222,8 +272,9 @@ func _build_wreck() -> void:
 		var a := k * 1.1 + 0.4
 		var p := Vector2(cos(a), sin(a)) * (5.0 + k)
 		box(Vector3(0.6 + k * 0.1, 0.12, 0.4), Vector3(p.x, 0.05, p.y), grey if k % 2 else white, Vector3(0.2, a, 0.1), root)
-	put("survival/box-large", Vector2(-1.5, 3.2).rotated(-0.5), 3.0, 0.3)
-	put("survival/barrel", Vector2(2.4, -2.6).rotated(-0.5), 3.0, 0.0)
+	put("ph/wooden_crate_02", Vector2(-1.5, 3.2).rotated(-0.5), 1.4, 0.3)
+	put("ph/barrel_03", Vector2(2.4, -2.6).rotated(-0.5), 1.15, 0.0)
+	put("ph/barrel_03", Vector2(3.1, -1.9).rotated(-0.5), 1.1, 1.0).rotation = Vector3(PI / 2, 0.7, 0)
 	var crate := put("survival/chest", Vector2(-2.2, -2.4).rotated(-0.5), 3.2, 1.2)
 	inter.append({"kind": "wreck_crate", "p": Vector2(-2.2, -2.4).rotated(-0.5), "r": 2.4, "label": "Enkaz sandığını aç", "node": crate})
 	inter.append({"kind": "radio", "p": Vector2(3.2, 1.6).rotated(-0.5), "r": 2.4, "label": "Telsiz"})
@@ -259,6 +310,7 @@ func _build_ruin(i: int) -> void:
 		var col := Models.instance("nature/statue_column" if k != 4 or i % 2 == 0 else "nature/statue_columnDamaged")
 		col.scale = Vector3(3.2, 3.6, 3.2)
 		col.position = Vector3(p.x, 0, p.y)
+		skin(col, stone_mat)
 		root.add_child(col)
 		_obstacle(c + p.rotated(-root.rotation.y), 0.55)
 	box(Vector3(8.6, 0.5, 6.6), Vector3(0, 3.65, 0), stone_mat, Vector3(0.0, 0, 0.03), root)
@@ -270,11 +322,13 @@ func _build_ruin(i: int) -> void:
 		var b := Models.instance("nature/statue_block")
 		b.scale = Vector3.ONE * g.rng.randf_range(2.5, 3.5)
 		b.position = Vector3(p.x, 0, p.y); b.rotation = Vector3(g.rng.randf() * 0.3, a, g.rng.randf() * 0.3)
+		skin(b, stone_mat)
 		root.add_child(b)
 		_obstacle(c + p.rotated(-root.rotation.y), 0.6)
 	var head := Models.instance("nature/statue_head")
 	head.scale = Vector3.ONE * 3.0
 	head.position = Vector3(6.5, -0.3, 3.5); head.rotation = Vector3(0.25, 2.2, 0.15)
+	skin(head, stone_mat)
 	root.add_child(head)
 	_obstacle(c + Vector2(6.5, 3.5).rotated(-root.rotation.y), 1.2)
 	var pot := Models.instance("nature/pot_large"); pot.scale = Vector3.ONE * 2.5; pot.position = Vector3(-2.4, 0, 1.5); root.add_child(pot)
@@ -292,7 +346,7 @@ func _build_well(i: int) -> void:
 	add_child(root)
 	var ring := MeshInstance3D.new()
 	var cm := CylinderMesh.new(); cm.top_radius = 1.3; cm.bottom_radius = 1.4; cm.height = 1.0; cm.radial_segments = 14
-	ring.mesh = cm; ring.material_override = stone_mat; ring.position.y = 0.5
+	ring.mesh = cm; ring.material_override = rock_mat; ring.position.y = 0.5
 	root.add_child(ring)
 	var inner := MeshInstance3D.new()
 	var im := CylinderMesh.new(); im.top_radius = 1.0; im.bottom_radius = 1.0; im.height = 0.05; im.radial_segments = 14
@@ -316,11 +370,13 @@ func _build_cave(i: int) -> void:
 	var cave := Models.instance("nature/cliff_blockCave_rock")
 	cave.scale = Vector3(8.0, 6.0, 8.0)
 	root.add_child(cave)
+	skin(cave, rock_mat)
 	for k in 3:
-		var r := Models.instance("nature/rock_tall" + ["A", "B", "C"][k])
-		r.scale = Vector3.ONE * (4.0 + k)
-		r.position = Vector3(-5.0 + k * 5.0, 0, -4.5)
+		var r := Models.instance("ph/moon_rock_02")
+		r.scale = Vector3(18.0 + k * 3.0, 22.0 + k * 4.0, 18.0 + k * 3.0)
+		r.position = Vector3(-5.0 + k * 5.0, -0.2, -4.5)
 		r.rotation.y = k * 1.3
+		skin(r, rock_mat)
 		root.add_child(r)
 	# collision: the block minus its open front
 	var dir := Vector2(cos(c.a), sin(c.a))
@@ -339,7 +395,7 @@ func _build_caravan() -> void:
 	root.position = Vector3(c.x, ground(c), c.y)
 	root.rotation.y = atan2(c.x, c.y)
 	add_child(root)
-	var wall := _mat(Color("#d9b07a"), 0.9)
+	var wall := pbr("clay", Color(1.2, 1.05, 0.9), 0.4)
 	var L := 26.0
 	for side in 4:
 		var rot := side * PI / 2
@@ -366,9 +422,9 @@ func _build_caravan() -> void:
 		t.rotation.y = PI
 		root.add_child(t)
 	for k in 4:
-		var palm := Models.instance("nature/tree_palmTall"); palm.scale = Vector3.ONE * 4.5
-		palm.position = Vector3(-9 + k * 6, 0, -2); root.add_child(palm)
-	var fire := Models.instance("nature/campfire_stones"); fire.scale = Vector3.ONE * 4.0; root.add_child(fire)
+		var palm := MeshInstance3D.new(); palm.mesh = Models.mesh(["proc/palm_a", "proc/palm_c"][k % 2])
+		palm.position = Vector3(-9 + k * 6, 0, -2); palm.rotation.y = k * 1.7; root.add_child(palm)
+	var fire := Models.instance("ph/stone_fire_pit"); fire.scale = Vector3.ONE * 1.1; fire.position.y = 0.15; root.add_child(fire)
 	var flag := box(Vector3(0.2, 9.0, 0.2), Vector3(0, 4.5, -L / 2 - 1.5), _mat(Color("#5b3a1e")), Vector3.ZERO, root)
 	box(Vector3(2.4, 1.4, 0.05), Vector3(1.2, 8.2, -L / 2 - 1.5), _mat(Color("#2a8f5a")), Vector3.ZERO, root)
 	shades.append([c, 13.0])
@@ -377,17 +433,19 @@ func _build_caravan() -> void:
 
 func _build_obelisk() -> void:
 	var o := put("nature/statue_obelisk", g.obelisk, 13.0)
+	skin(o, pbr("rock", Color(0.95, 0.8, 0.68), 0.35))
 	_obstacle(g.obelisk, 2.2)
 	shades.append([g.obelisk, 2.5])
 
 # ---------------------------------------------------------------- resource nodes (MultiMesh)
+## [model, scale, tint, y-squash, crown height (palms)]
 const NODE_LOOK := {
-	"cactus": [["nature/cactus_tall", 3.0, Color(1, 1, 1)], ["nature/cactus_short", 3.4, Color(1, 1, 1)]],
-	"pear": [["nature/cactus_short", 2.6, Color(0.85, 1.0, 0.8)]],
-	"bush": [["nature/plant_bushDetailed", 2.8, Color(0.95, 0.85, 0.55)], ["nature/plant_bush", 3.4, Color(0.9, 0.8, 0.5)]],
-	"stone": [["nature/rock_smallA", 2.4, Color(0.95, 0.9, 0.85)], ["nature/rock_smallD", 2.2, Color(0.9, 0.85, 0.8)]],
-	"larva": [["nature/rock_smallFlatA", 3.2, Color(0.85, 0.7, 0.6)]],
-	"palm": [["nature/tree_palm", 4.0, Color(1, 1, 1)], ["nature/tree_palmBend", 4.2, Color(1, 1, 1)], ["nature/tree_palmTall", 4.0, Color(1, 1, 1)], ["nature/tree_palmDetailedTall", 3.6, Color(1, 1, 1)]],
+	"cactus": [["proc/saguaro_a", 1.0, Color(1, 1, 1)], ["proc/saguaro_b", 1.1, Color(1, 1, 1)]],
+	"pear": [["proc/pear", 1.0, Color(1, 1, 1)]],
+	"bush": [["ph/dry_branches_medium_01", 1.5, Color(1.1, 0.95, 0.8)], ["ph/dead_quiver_branch_01", 2.4, Color(1.1, 1.0, 0.85)]],
+	"stone": [["ph/moon_rock_02", 3.6, Color(1.3, 1.02, 0.8)], ["ph/moon_rock_06", 9.0, Color(1.3, 1.0, 0.78)]],
+	"larva": [["ph/moon_rock_06", 15.0, Color(1.2, 0.92, 0.72), 0.45]],
+	"palm": [["proc/palm_a", 1.0, Color(1, 1, 1), 1.0, 4.6], ["proc/palm_b", 1.0, Color(1, 1, 1), 1.0, 4.0], ["proc/palm_c", 1.0, Color(1, 1, 1), 1.0, 5.2]],
 }
 const NODE_LABEL := {"cactus": "Kaktüsü kes", "pear": "Frenk inciri topla", "bush": "Çalı topla", "stone": "Taş al", "larva": "Taşı kaldır", "palm": "Palmiye"}
 const RESPAWN := {"cactus": 3.0, "pear": 1.0, "bush": 2.0, "stone": 2.0, "larva": 1.0, "palm": 2.0}
@@ -444,6 +502,11 @@ func _flush_mm() -> void:
 				mm.set_instance_transform(i, xs[i])
 			var mmi := MultiMeshInstance3D.new()
 			mmi.multimesh = mm
+			# small props fade out early (cheap LOD); big rocks/palms stay to the fog line
+			if e.mesh.get_aabb().size.length() < 1.5 and not key.begins_with("proc/"):
+				mmi.visibility_range_end = 70.0
+				mmi.visibility_range_end_margin = 8.0
+				mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 			add_child(mmi)
 			e.mmi.append(mmi)
 
@@ -453,8 +516,8 @@ func _set_visible(ref: Array, xf: Transform3D, on: bool) -> void:
 		return
 	mmi.multimesh.set_instance_transform(ref[2], xf if on else Transform3D(Basis().scaled(Vector3.ONE * 0.0001), xf.origin - Vector3(0, 50, 0)))
 
-func _xf(p: Vector2, rot: float, s: float, yoff := 0.0) -> Transform3D:
-	return Transform3D(Basis(Vector3.UP, rot).scaled(Vector3.ONE * s), Vector3(p.x, ground(p) + yoff, p.y))
+func _xf(p: Vector2, rot: float, s: float, yoff := 0.0, ys := 1.0) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, rot).scaled(Vector3(s, s * ys, s)), Vector3(p.x, ground(p) + yoff, p.y))
 
 func _build_nodes() -> void:
 	var fruit_mesh_path := "food/pear"
@@ -462,7 +525,7 @@ func _build_nodes() -> void:
 		var n: Dictionary = g.nodes[i]
 		var looks: Array = NODE_LOOK[n.t]
 		var look: Array = looks[i % looks.size()]
-		var xf := _xf(n.p, n.r, look[1] * n.s, -0.05)
+		var xf := _xf(n.p, n.r, look[1] * n.s, -0.05, look[3] if look.size() > 3 else 1.0)
 		var st := {"t": n.t, "p": n.p, "ready_at": 0.0, "vis": [], "fruit": [], "xf": [], "fxf": []}
 		var ref := _mm_add(look[0], look[2], xf, n.p)
 		if n.t in ["palm", "pear"]:
@@ -473,7 +536,7 @@ func _build_nodes() -> void:
 				for k in 3:
 					var a = n.r + k * TAU / 3
 					var fp = n.p + Vector2(cos(a), sin(a)) * 0.6
-					var fxf := _xf(fp, a, 1.6, 4.2 * n.s)
+					var fxf := _xf(fp, a, 1.6, (look[4] - 0.25) * n.s)
 					st.fruit.append(_mm_add("food/grapes", Color(0.55, 0.32, 0.18), fxf, n.p)); st.fxf.append(fxf)
 			else:
 				_obstacle(n.p, 0.35)
@@ -489,22 +552,32 @@ func _build_nodes() -> void:
 		nodes.append(st)
 		inter.append({"kind": "node", "i": i, "p": n.p, "r": 1.9 if n.t != "palm" else 2.2, "label": NODE_LABEL[n.t]})
 
+## Decor keeps the generator's positions/sizes/collision; only the look is remapped to
+## Poly Haven scans (rocks, dry shrubs, succulents).
+func _decor_look(path: String, p: Vector2, ds: float, k: int) -> Array:
+	var warm := Color(1.3, 1.0, 0.78)
+	if path.begins_with("rock-sand"):
+		return ["ph/moon_rock_02", ds * 5.5, warm, 0.8]
+	if path.begins_with("rock_large"):
+		return ["ph/moon_rock_06", ds * 40.0, Color(0.95, 0.74, 0.58), 0.55]
+	if path.begins_with("rock_tall"):
+		return ["ph/moon_rock_02", ds * 15.0, Color(0.95, 0.74, 0.58), 1.6]
+	if path.begins_with("flower"):
+		return ["nature/" + path, ds * 3.0, Color(1, 1, 1), 1.0]
+	if g.oasis_factor(p) > 0.3:
+		return ["ph/shrub_sorrel_01", ds * 4.5, Color(1, 1, 1), 1.0] if k % 2 == 0 else ["ph/crystalline_iceplant", ds * 0.8, Color(1, 1, 1), 1.0]
+	if path.begins_with("grass"):
+		return ["ph/crystalline_iceplant", ds * 0.6, Color(1.05, 0.95, 0.8), 1.0] if k % 3 == 0 else ["ph/dry_branches_medium_01", ds * 0.9, Color(1.1, 0.95, 0.8), 1.0]
+	return ["ph/dead_quiver_branch_01", ds * 2.2, Color(1.05, 0.95, 0.85), 1.0] if k % 2 == 0 else ["ph/dry_branches_medium_01", ds * 1.2, Color(1.1, 0.95, 0.8), 1.0]
+
 func _build_decor() -> void:
+	var k := 0
 	for d in g.decor:
 		var path: String = d.m
-		var folder := "survival/" if path.begins_with("rock-sand") else "nature/"
-		var col := Color(1, 1, 1)
-		var s: float = d.s * 2.6
-		if path.begins_with("grass") or path.begins_with("plant"):
-			col = Color(1.05, 0.9, 0.55)
-			s = d.s * 3.0
-		elif path.begins_with("rock_large") or path.begins_with("rock_tall"):
-			col = Color(1.0, 0.72, 0.55)
-			s = d.s * 3.5
-		elif path.begins_with("rock-sand"):
-			s = d.s * 3.0
-		var xf := _xf(d.p, d.r, s, -0.1)
-		_mm_add(folder + path, col, xf, d.p)
+		var look := _decor_look(path, d.p, d.s, k)
+		k += 1
+		var xf := _xf(d.p, d.r, look[1], -0.1, look[3])
+		_mm_add(look[0], look[2], xf, d.p)
 		if d.solid:
 			var rr = 1.2 * d.s * (1.4 if path.begins_with("rock_large") else 1.0)
 			_obstacle(d.p, rr)
@@ -567,8 +640,9 @@ func place(kind: String, p: Vector2, data := {}) -> Dictionary:
 	it.merge(data, true)
 	match kind:
 		"fire":
-			put("nature/campfire_stones", Vector2.ZERO, 3.0, 0.0, root).position = Vector3.ZERO
-			var logs := put("nature/campfire_logs", Vector2.ZERO, 3.2, 0.5, root); logs.position = Vector3(0, 0.05, 0)
+			put("ph/stone_fire_pit", Vector2.ZERO, 0.8, 0.0, root).position = Vector3(0, 0.12, 0)
+			var logs := put("nature/campfire_logs", Vector2.ZERO, 3.0, 0.5, root); logs.position = Vector3(0, 0.05, 0)
+			skin(logs, pbr("bark", Color(0.9, 0.75, 0.6), 2.5))
 			it.logs = logs
 			var ash := put("nature/campfire_logs", Vector2.ZERO, 3.0, 1.1, root); ash.position = Vector3(0, 0.02, 0)
 			Models.tint(ash, Color(0.25, 0.22, 0.22)); ash.visible = false
