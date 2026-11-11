@@ -57,7 +57,7 @@ func _process(_dt: float) -> void:
 func _draw() -> void:
 	var vs := get_viewport_rect().size
 	draw_rect(Rect2(Vector2.ZERO, vs), Color(0.08, 0.04, 0.02, 0.6))
-	var side := minf(vs.x - 40, vs.y - 150)
+	var side := minf(vs.x - 40, vs.y - 190)
 	map_rect = Rect2(Vector2((vs.x - side) / 2, 70), Vector2(side, side))
 	draw_style_box(UiKit.tex_box("panel_brown", 16), map_rect.grow(18))
 	if tex:
@@ -91,8 +91,8 @@ func _draw() -> void:
 	# north
 	_t(map_rect.position + Vector2(18, 26), "Kuzey", 18, Color("#3a2414"), 0)
 	var info := "Haritaya dokunarak işaret koy/kaldır (en fazla 3). Keşfedilen: %%%d" % game.explored_pct()
-	_t(Vector2(vs.x / 2, map_rect.end.y + 44), info, 16, Color("#fff4dc"))
-	var cr := Rect2(Vector2(vs.x / 2 - 70, map_rect.end.y + 56), Vector2(140, 44))
+	_t(Vector2(vs.x / 2, map_rect.end.y + 42), info, 16, Color("#fff4dc"))
+	var cr := Rect2(Vector2(vs.x / 2 - 70, map_rect.end.y + 52), Vector2(140, 44))
 	if cr.end.y > vs.y - 4:
 		cr.position.y = vs.y - 50
 	draw_style_box(UiKit.tex_box("button_brown", 12), cr)

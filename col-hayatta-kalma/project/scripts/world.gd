@@ -53,7 +53,7 @@ func _biome_color(p: Vector2, h: float) -> Color:
 	c = c.lerp(Color("#c47a4a").lerp(Color("#a8623d"), n), smoothstep(0.35, 0.7, rf))
 	c = c.lerp(Color("#f4ecdc").lerp(Color("#e6dccb"), n), smoothstep(0.4, 0.75, g.salt_factor(p)))
 	var of := g.oasis_factor(p)
-	c = c.lerp(Color("#9cbf5a").lerp(Color("#79a64a"), n), smoothstep(0.15, 0.6, of))
+	c = c.lerp(Color("#a9b46e").lerp(Color("#8c9d58"), n), smoothstep(0.15, 0.6, of))
 	if b == WorldGen.B.SCRUB:
 		c = c.lerp(Color("#d8b06a"), 0.45)
 	# darker dune troughs, lighter crests
@@ -100,7 +100,7 @@ func _build_terrain() -> void:
 	var skirt := MeshInstance3D.new()
 	var pm := PlaneMesh.new(); pm.size = Vector2(2400, 2400)
 	skirt.mesh = pm
-	skirt.position.y = 0.6
+	skirt.position.y = -2.6   # below every basin so it only shows past the map edge
 	var sm := StandardMaterial3D.new(); sm.albedo_color = Color("#e9b46c"); sm.roughness = 1.0
 	skirt.material_override = sm
 	add_child(skirt)
@@ -243,7 +243,7 @@ func _build_wreck() -> void:
 	var curve := Curve.new(); curve.add_point(Vector2(0, 0.4)); curve.add_point(Vector2(1, 2.5))
 	smoke.scale_amount_curve = curve
 	smoke.color = Color(0.25, 0.22, 0.2, 0.55)
-	smoke.mesh = Fx.billboard("smoke_04", Color(1, 1, 1, 1))
+	smoke.mesh = Fx.billboard("smoke_04", Color(0.3, 0.27, 0.25, 0.5))
 	root.add_child(smoke)
 
 func _build_ruin(i: int) -> void:

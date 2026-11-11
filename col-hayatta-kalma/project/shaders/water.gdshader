@@ -8,10 +8,10 @@ void vertex() {
 void fragment() {
 	float w = sin(wpos.x * 1.3 + TIME * 1.6) * 0.5 + sin(wpos.z * 1.7 - TIME * 1.2) * 0.5;
 	float ring = smoothstep(0.75, 1.0, w);
-	vec3 deep = vec3(0.05, 0.42, 0.55);
-	vec3 shallow = vec3(0.25, 0.78, 0.78);
-	ALBEDO = mix(deep, shallow, 0.35 + 0.25 * w) + ring * 0.25;
-	ROUGHNESS = 0.08;
+	vec3 deep = vec3(0.01, 0.12, 0.2);
+	vec3 shallow = vec3(0.05, 0.35, 0.4);
+	ALBEDO = mix(deep, shallow, 0.35 + 0.25 * w) + ring * 0.12;
+	ROUGHNESS = 0.35;
 	METALLIC = 0.0;
-	SPECULAR = 0.7;
+	SPECULAR = 0.25;
 }

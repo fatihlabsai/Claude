@@ -146,14 +146,12 @@ func _setup_scene() -> void:
 	sand_fx = CPUParticles3D.new()
 	sand_fx.amount = 160
 	sand_fx.lifetime = 1.6
-	sand_fx.mesh = Fx.billboard("dirt_02", Color(1, 1, 1), false, 0.6)
+	sand_fx.mesh = Fx.billboard("dirt_02", Color(0.95, 0.74, 0.45, 0.55), false, 0.6)
 	sand_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	sand_fx.emission_box_extents = Vector3(22, 5, 22)
 	sand_fx.gravity = Vector3.ZERO
 	sand_fx.initial_velocity_min = 14.0; sand_fx.initial_velocity_max = 22.0
 	sand_fx.spread = 8.0
-	var gr := Gradient.new(); gr.set_color(0, Color(0.95, 0.75, 0.45, 0.0)); gr.add_point(0.3, Color(0.95, 0.75, 0.45, 0.7)); gr.set_color(2, Color(0.9, 0.7, 0.4, 0.0))
-	sand_fx.color_ramp = gr
 	sand_fx.emitting = false
 	add_child(sand_fx)
 	# UI layers
@@ -559,8 +557,8 @@ func _update_sky(_dt: float) -> void:
 	# depth fog hides the draw-distance edge; the storm pulls it right up to the player
 	var far_f: float = q.far
 	var sheltered_k := 1.6 if shelter_name != "" else 1.0
-	env.fog_depth_end = lerpf(far_f, 16.0 * sheltered_k, storm_k)
-	env.fog_depth_begin = lerpf(far_f * 0.45, 0.0, storm_k)
+	env.fog_depth_end = lerpf(far_f, 30.0 * sheltered_k, storm_k)
+	env.fog_depth_begin = lerpf(far_f * 0.45, 13.0, storm_k)
 	env.fog_density = lerpf(1.0, 0.92, storm_k)
 	sun.light_energy *= 1.0 - storm_k * 0.55
 
@@ -595,7 +593,7 @@ func _update_overlays(_dt: float) -> void:
 	var k := weather.intensity(t_abs)
 	storm_rect.visible = k > 0.01
 	var sm := storm_rect.material as ShaderMaterial
-	sm.set_shader_parameter("amount", k * (0.45 if shelter_name != "" else 0.85))
+	sm.set_shader_parameter("amount", k * (0.35 if shelter_name != "" else 0.6))
 	var wd := Vector2.from_angle(weather.dir)
 	sm.set_shader_parameter("wind", Vector2(wd.x, wd.y * 0.3))
 	sand_fx.emitting = k > 0.2
@@ -639,6 +637,8 @@ func _unhandled_input(ev: InputEvent) -> void:
 		do_attack()
 	elif ev.is_action_pressed("drink"):
 		do_drink()
+	elif ev is InputEventKey and ev.pressed and not ev.echo and ev.physical_keycode >= KEY_1 and ev.physical_keycode <= KEY_4:
+		use_slot(ev.physical_keycode - KEY_1)   # quick slots 1-4
 	elif ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_LEFT and not touch and ev.device != InputEvent.DEVICE_ID_EMULATION:
 			do_attack()
@@ -1176,7 +1176,7 @@ func _tutorial() -> void:
 		hud.show_hint("Öğle güneşi vücut ısını yükseltiyor (termometre). Kırmızıya ulaşırsa sıcak çarpar. Palmiye, kaya, enkaz ya da harabe gölgesinde bekle; koşmak ısıtır.", "stats")
 	elif not tut.has("fire") and day == 1 and h >= 16.3:
 		tut.fire = true
-		hud.show_hint("Gece çöl donar! Çalılardan odun, yerden taş topla; sonra Çanta › Üret › Kamp ateşi (3 odun + 2 taş). Geceyi ateşin yanında geçir.", "bag")
+		hud.show_hint("Gece çöl donar! Çalılardan odun, yerden taş topla; sonra Çanta > Üret > Kamp ateşi (3 odun + 2 taş). Geceyi ateşin yanında geçir.", "bag")
 	elif not tut.has("storm") and storm_state == "warn":
 		tut.storm = true
 		hud.show_hint("Kum fırtınası geliyor! 60 saniyen var: mağara, harabe, enkaz veya kendi gölgeliğine gir. Açıkta kalırsan canın gider ve ateşler söner.", "map")
@@ -1202,7 +1202,7 @@ func _spawn_heli(anim: bool) -> void:
 		world.box(Vector3(0.15, 0.15, 4.0), Vector3(sx * 1.1, 0.1, 0), world._mat(Color("#333333")), Vector3.ZERO, heli)
 	var rotor := world.box(Vector3(9.0, 0.08, 0.4), Vector3(0, 2.25, 0), world._mat(Color("#333333")), Vector3.ZERO, heli)
 	rotor.name = "Rotor"
-	var tw := create_tween().set_loops()
+	var tw := rotor.create_tween().set_loops()
 	tw.tween_property(rotor, "rotation:y", TAU, 0.25).from(0.0)
 	if anim:
 		heli.position.y += 40.0

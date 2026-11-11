@@ -64,6 +64,22 @@ func _run() -> void:
 	m.quit_to_title(); await wait(5)
 	await m.continue_game(); await wait(5)
 	print("continued day=", m.day, " inv=", m.inv, " playing=", m.playing)
+	# win A: radio
+	for i in m.inv.size(): m.inv[i] = null
+	m.give("anten"); m.give("pil"); m.give("devre")
+	m.player.pos = Vector2(3.2, 1.6).rotated(-0.5) + Vector2(1.2, 0); m._tick = 0; await wait(3)
+	print("radio prompt=", m.prompt); m.do_interact(); await wait(2)
+	m.t_abs += GameData.DAY_LEN + 1.0; m._slow = 0; await wait(5)
+	print("heli=", m.heli != null, " radio=", m.radio)
+	m.player.pos = Vector2(14, -10) + Vector2(3.5, 0); m._tick = 0; await wait(3)
+	print("heli prompt=", m.prompt); m.do_interact(); await wait(2)
+	print("win menu=", m.menus.current)
+	await m.continue_game(); await wait(3)
+	print("save after win continue playing=", m.playing)
+	await m.new_game(0); await wait(5)
+	m.player.pos = m.g.caravan + Vector2(0, 9); m._slow = 0; await wait(5)
+	print("caravan win menu=", m.menus.current)
+	await m.new_game(2); await wait(5)
 	# death
 	m.s.hp = 0.5; m.s.water = 0; await get_tree().create_timer(3.5).timeout
 	print("dead=", m.s.dead(), " menu=", m.menus.current)

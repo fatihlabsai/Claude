@@ -167,7 +167,9 @@ func _raw_height(p: Vector2) -> float:
 	for f in flats:
 		var w := 1.0 - smoothstep(f[1] * 0.6, f[1] * 1.6, p.distance_to(f[0]))
 		h = lerpf(h, 1.5 + rf * 7.5, w)
-	# keep map edge low-ish dunes
+	# fade into the flat sand skirt at the map edge
+	var edge := maxf(absf(p.x), absf(p.y))
+	h = lerpf(h, -2.6, smoothstep(HALF - 25.0, HALF - 1.0, edge))
 	return h
 
 func _build_heights() -> void:

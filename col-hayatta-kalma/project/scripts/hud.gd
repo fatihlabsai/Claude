@@ -161,7 +161,7 @@ func _draw() -> void:
 			draw_line(sc + Vector2(cos(a), sin(a)) * 15, sc + Vector2(cos(a), sin(a)) * 20, Color("#ffcf40"), 3.0, true)
 		draw_circle(sc, 12, Color("#ffcf40"))
 	_text(cp + Vector2(58, 28), "%d. Gün" % game.day, 22, Color("#ffe7b8"))
-	_text(cp + Vector2(58, 52), "%s  ·  %d°C" % [GameData.clock_text(game.tod), roundi(game.ambient_shown)], 17, Color.WHITE, false, false, 4)
+	_text(cp + Vector2(58, 52), "%s  ·  %d°C" % [GameData.clock_text(game.tod), roundi(GameData.air_temp(game.tod, game.day))], 17, Color.WHITE, false, false, 4)
 	rects["clock"] = Rect2(cp, Vector2(178, 64))
 	# --- stats ---
 	var sp := Vector2(16, vs.y - 150) if not touch else Vector2(16, 86)
