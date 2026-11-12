@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>YouTube Gelir Hesaplayıcı</title>
-  <meta name="description" content="Aylık görüntülenme, RPM ve Shorts oranına göre tahmini YouTube geliri hesapla.">
+  <meta name="description" content="Aylık görüntülenme, RPM ve Shorts oranına göre tahmini YouTube geliri hesapla. İstersen bir kanal ekle.">
   <style>
     :root {
       --bg: #0f1412;
@@ -14,10 +14,10 @@
       --text: #eef3ef;
       --muted: #8fa097;
       --accent: #3ecf8e;
-      --accent-dim: #1f6b4a;
       --warn: #e8b86d;
       --field: #121a17;
       --shadow: 0 18px 40px rgba(0,0,0,.35);
+      --danger: #e07a7a;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
@@ -62,7 +62,6 @@
     .row { display: grid; gap: 14px; grid-template-columns: 1fr; }
     @media (min-width: 640px) {
       .row.two { grid-template-columns: 1fr 1fr; }
-      .row.three { grid-template-columns: 1fr 1fr 1fr; }
     }
     label { display: block; font-size: .86rem; margin-bottom: 6px; color: #c9d4cd; }
     label span { color: var(--muted); font-weight: 400; }
@@ -97,10 +96,7 @@
     }
     .seg button.on { background: var(--accent); color: #062016; }
     .slider-wrap { display: grid; gap: 8px; }
-    input[type="range"] {
-      width: 100%;
-      accent-color: var(--accent);
-    }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
     .ratio {
       display: flex;
       justify-content: space-between;
@@ -141,6 +137,46 @@
       border-radius: 12px;
       padding: 12px 14px;
     }
+    .add-row { display: flex; gap: 8px; align-items: stretch; }
+    .add-row input { flex: 1; }
+    .btn {
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #062016;
+      font-weight: 700;
+      padding: 11px 16px;
+      cursor: pointer;
+      font-size: .95rem;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .6; cursor: wait; }
+    .btn.ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .btn.ghost:hover { border-color: var(--accent); }
+    .msg { font-size: .88rem; margin: 10px 0 0; }
+    .msg.err { color: var(--danger); }
+    .msg.ok { color: var(--muted); }
+    .channel-head { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
+    .channel-head img {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--field); object-fit: cover; flex-shrink: 0;
+    }
+    .channel-head h3 { margin: 0; font-size: 1.15rem; letter-spacing: -.02em; }
+    .channel-head p { margin: 2px 0 0; color: var(--muted); font-size: .88rem; }
+    .status {
+      font-size: .88rem;
+      background: #2a2316;
+      border: 1px solid #4a3c1f;
+      color: var(--warn);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 0 0 14px;
+    }
+    .hidden { display: none !important; }
     footer { margin-top: 22px; color: var(--muted); font-size: .8rem; }
     footer a { color: var(--muted); }
   </style>
@@ -149,8 +185,51 @@
   <main>
     <header>
       <h1>YouTube Gelir Hesaplayıcı</h1>
-      <p>Aylık görüntülenme, RPM ve Shorts oranına göre tahmini gelirini hesapla. Hedef gelirden gereken görüntülenmeyi de çıkarabilirsin.</p>
+      <p>Bir kanal ekleyerek veya aylık görüntülenme, RPM ve Shorts oranını girerek tahmini geliri hesapla. Hedef gelirden gereken görüntülenmeyi de çıkarabilirsin.</p>
     </header>
+
+    <section class="card">
+      <h2>Kanal ekle</h2>
+      <label for="channel-input">Kanal bağlantısı, @kullanıcı adı veya kanal kimliği</label>
+      <div class="add-row">
+        <input type="text" id="channel-input" placeholder="@MrBeast veya youtube.com/@kanal" autocomplete="off">
+        <button type="button" class="btn" id="channel-btn">Ekle</button>
+      </div>
+      <p class="hint">Kanalın kamuya açık videolarından tahmini aylık görüntülenme çıkarılır. Para kazanma durumu doğrulanamazsa bu açıkça yazılır; gelir yine de “açık olsaydı” tahmini olarak gösterilir.</p>
+      <p class="msg hidden" id="channel-msg"></p>
+    </section>
+
+    <section class="card hidden" id="channel-card">
+      <h2>Kanal tahmini</h2>
+      <div class="channel-head">
+        <img id="ch-thumb" alt="">
+        <div>
+          <h3 id="ch-name">—</h3>
+          <p id="ch-meta">—</p>
+        </div>
+      </div>
+      <p class="status" id="ch-status"></p>
+      <div class="results">
+        <div class="stat">
+          <div class="k">Tahmini aylık gelir</div>
+          <div class="v" id="ch-month">—</div>
+        </div>
+        <div class="stat">
+          <div class="k">Tahmini yıllık gelir</div>
+          <div class="v" id="ch-year">—</div>
+        </div>
+      </div>
+      <div class="breakdown">
+        <div><span>Tahmini aylık görüntülenme</span><span id="ch-views">—</span></div>
+        <div><span>Shorts oranı (izlenmeye göre)</span><span id="ch-ratio">—</span></div>
+        <div><span>Uzun videodan</span><span id="ch-long">—</span></div>
+        <div><span>Shorts’tan</span><span id="ch-shorts">—</span></div>
+      </div>
+      <p class="hint" id="ch-method"></p>
+      <div style="margin-top:14px">
+        <button type="button" class="btn ghost" id="ch-apply">Bu rakamları manuel hesaba aktar</button>
+      </div>
+    </section>
 
     <section class="card">
       <h2>Para birimi</h2>
@@ -171,7 +250,7 @@
     </section>
 
     <section class="card">
-      <h2>Girdiler</h2>
+      <h2>Manuel giriş</h2>
       <div class="row two">
         <div>
           <label for="views">Aylık görüntülenme</label>
@@ -224,7 +303,7 @@
       </div>
     </section>
 
-    <p class="note">Rakamlar yalnızca tahmindir. Gerçek gelir; niş, ülke, reklam doldurma oranı, izlenme süresi, mevsim ve YouTube’un ödeme kurallarına göre değişir. Shorts ve uzun videoların RPM’leri birbirinden çok farklı olabilir.</p>
+    <p class="note">Rakamlar yalnızca tahmindir. Gerçek gelir; niş, ülke, reklam doldurma oranı, izlenme süresi, mevsim ve YouTube’un ödeme kurallarına göre değişir. Shorts ve uzun videoların RPM’leri birbirinden çok farklı olabilir. Bir kanalın para kazanmasının açık olup olmadığı kamuya açık verilerden her zaman anlaşılamaz.</p>
     <footer><a href="../">Claude projeleri</a></footer>
   </main>
   <script>
@@ -238,6 +317,7 @@
       curTry: $("cur-try"), curUsd: $("cur-usd"), rateWrap: $("rate-wrap")
     };
     let currency = "TRY";
+    let linked = null;
 
     function parseNum(s) {
       if (s == null) return NaN;
@@ -255,19 +335,40 @@
       return Number.isFinite(n) ? n : NaN;
     }
     function formatMoney(n) {
-      const loc = "tr-TR";
       if (!Number.isFinite(n)) return "—";
       const opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-      return currency === "USD"
-        ? new Intl.NumberFormat(loc, opts).format(n) + " $"
-        : new Intl.NumberFormat(loc, opts).format(n) + " TL";
+      const s = new Intl.NumberFormat("tr-TR", opts).format(n);
+      return currency === "USD" ? s + " $" : s + " TL";
     }
-    function formatViews(n) {
+    function formatInt(n) {
       if (!Number.isFinite(n) || n < 0) return "—";
-      return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.ceil(n));
+      return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.round(n));
+    }
+    function formatCompact(n) {
+      if (!Number.isFinite(n)) return "—";
+      const abs = Math.abs(n);
+      const fmt = (v, s) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: v >= 10 ? 0 : 1 }).format(v) + " " + s;
+      if (abs >= 1e9) return fmt(n / 1e9, "milyar");
+      if (abs >= 1e6) return fmt(n / 1e6, "milyon");
+      if (abs >= 1e3) return fmt(n / 1e3, "bin");
+      return formatInt(n);
     }
     function toDisplay(n) {
       return currency === "USD" ? n : n * parseNum(els.rate.value);
+    }
+    function rpmInputs() {
+      const rpmL = parseNum(els.rpmLong.value);
+      const rpmS = parseNum(els.rpmShorts.value);
+      const rate = parseNum(els.rate.value);
+      const rateOk = currency === "USD" || (Number.isFinite(rate) && rate > 0);
+      return { rpmL, rpmS, rateOk };
+    }
+    function revenueUSD(views, shortsShare, rpmL, rpmS) {
+      const longViews = views * (1 - shortsShare);
+      const shortViews = views * shortsShare;
+      const longUSD = (longViews / 1000) * rpmL;
+      const shortUSD = (shortViews / 1000) * rpmS;
+      return { longUSD, shortUSD, monthUSD: longUSD + shortUSD };
     }
 
     function calc() {
@@ -277,34 +378,39 @@
       els.rateWrap.style.display = currency === "TRY" ? "block" : "none";
 
       const views = parseNum(els.views.value);
-      const rpmL = parseNum(els.rpmLong.value);
-      const rpmS = parseNum(els.rpmShorts.value);
       const target = parseNum(els.target.value);
-      const rate = parseNum(els.rate.value);
-      const rateOk = currency === "USD" || (Number.isFinite(rate) && rate > 0);
-
+      const { rpmL, rpmS, rateOk } = rpmInputs();
       const ok = [views, rpmL, rpmS].every((n) => Number.isFinite(n) && n >= 0) && rateOk;
       if (!ok) {
         els.month.textContent = els.year.textContent = els.long.textContent = els.shorts.textContent = els.needed.textContent = "—";
+      } else {
+        const rev = revenueUSD(views, shortsShare, rpmL, rpmS);
+        els.month.textContent = formatMoney(toDisplay(rev.monthUSD));
+        els.year.textContent = formatMoney(toDisplay(rev.monthUSD * 12));
+        els.long.textContent = formatMoney(toDisplay(rev.longUSD));
+        els.shorts.textContent = formatMoney(toDisplay(rev.shortUSD));
+        const rpv = ((1 - shortsShare) * rpmL + shortsShare * rpmS) / 1000;
+        if (Number.isFinite(target) && target >= 0 && rpv > 0) {
+          const targetUSD = currency === "USD" ? target : target / parseNum(els.rate.value);
+          els.needed.textContent = formatInt(Math.ceil(targetUSD / rpv));
+        } else els.needed.textContent = "—";
+      }
+      renderChannelRev();
+    }
+
+    function renderChannelRev() {
+      if (!linked) return;
+      const { rpmL, rpmS, rateOk } = rpmInputs();
+      const ok = [linked.views, rpmL, rpmS].every((n) => Number.isFinite(n) && n >= 0) && rateOk;
+      if (!ok) {
+        $("ch-month").textContent = $("ch-year").textContent = $("ch-long").textContent = $("ch-shorts").textContent = "—";
         return;
       }
-      const longViews = views * (1 - shortsShare);
-      const shortViews = views * shortsShare;
-      const monthUSD = (longViews / 1000) * rpmL + (shortViews / 1000) * rpmS;
-      const longUSD = (longViews / 1000) * rpmL;
-      const shortUSD = (shortViews / 1000) * rpmS;
-      els.month.textContent = formatMoney(toDisplay(monthUSD));
-      els.year.textContent = formatMoney(toDisplay(monthUSD * 12));
-      els.long.textContent = formatMoney(toDisplay(longUSD));
-      els.shorts.textContent = formatMoney(toDisplay(shortUSD));
-
-      const rpv = ((1 - shortsShare) * rpmL + shortsShare * rpmS) / 1000;
-      if (Number.isFinite(target) && target >= 0 && rpv > 0) {
-        const targetUSD = currency === "USD" ? target : target / rate;
-        els.needed.textContent = formatViews(targetUSD / rpv);
-      } else {
-        els.needed.textContent = "—";
-      }
+      const rev = revenueUSD(linked.views, linked.shortsShare, rpmL, rpmS);
+      $("ch-month").textContent = formatMoney(toDisplay(rev.monthUSD));
+      $("ch-year").textContent = formatMoney(toDisplay(rev.monthUSD * 12));
+      $("ch-long").textContent = formatMoney(toDisplay(rev.longUSD));
+      $("ch-shorts").textContent = formatMoney(toDisplay(rev.shortUSD));
     }
 
     function setCur(c) {
@@ -315,9 +421,204 @@
     }
     els.curTry.addEventListener("click", () => setCur("TRY"));
     els.curUsd.addEventListener("click", () => setCur("USD"));
-    ["views","target","rate","rpm-long","rpm-shorts","ratio"].forEach((id) => {
-      $(id).addEventListener("input", calc);
+    ["views","target","rate","rpm-long","rpm-shorts","ratio"].forEach((id) => $(id).addEventListener("input", calc));
+
+    const FALLBACK_INSTANCES = ["https://yt.chocolatemoo53.com"];
+    let instanceCache = null;
+
+    async function fetchJSON(url, ms) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      try {
+        const r = await fetch(url, { headers: { Accept: "application/json" }, signal: ctrl.signal });
+        if (!r.ok) throw new Error("http " + r.status);
+        return await r.json();
+      } finally { clearTimeout(t); }
+    }
+
+    async function getInstances() {
+      if (instanceCache) return instanceCache;
+      const bases = [...FALLBACK_INSTANCES];
+      try {
+        const list = await fetchJSON("https://api.invidious.io/instances.json", 8000);
+        for (const item of list || []) {
+          const info = item && item[1];
+          if (info && info.type === "https" && info.cors === true && info.uri) {
+            const u = String(info.uri).replace(/\/$/, "");
+            if (!bases.includes(u)) bases.push(u);
+          }
+        }
+      } catch (e) { /* yedek liste yeter */ }
+      instanceCache = bases;
+      return bases;
+    }
+
+    async function firstOk(makeUrl, timeout) {
+      const bases = await getInstances();
+      let lastErr = "Kanal bilgisi alınamadı.";
+      for (const base of bases) {
+        try {
+          return await fetchJSON(makeUrl(base), timeout);
+        } catch (e) { lastErr = e && e.name === "AbortError" ? "İstek zaman aşımına uğradı." : lastErr; }
+      }
+      throw new Error(lastErr);
+    }
+
+    function parseChannelInput(raw) {
+      const s = String(raw || "").trim();
+      if (!s) return { error: "Bir kanal bağlantısı, @kullanıcı adı veya kimlik gir." };
+      let t = s;
+      if (!/^https?:\/\//i.test(t) && /youtube\.com|youtu\.be/i.test(t)) t = "https://" + t.replace(/^\/+/, "");
+      try {
+        if (/^https?:\/\//i.test(t)) {
+          const u = new URL(t);
+          const host = u.hostname.replace(/^www\./, "");
+          const parts = u.pathname.split("/").filter(Boolean);
+          if (host === "youtu.be" && parts[0]) return { videoId: parts[0].slice(0, 11) };
+          if (parts[0] === "channel" && parts[1]) return { id: parts[1] };
+          if (parts[0] === "watch") return { videoId: u.searchParams.get("v") };
+          if (parts[0] === "shorts" && parts[1]) return { videoId: parts[1] };
+          if (parts[0] === "embed" && parts[1]) return { videoId: parts[1] };
+          if (parts[0] && parts[0].startsWith("@")) return { handle: parts[0] };
+          if (parts[0] === "c" && parts[1]) return { query: parts[1] };
+          if (parts[0] === "user" && parts[1]) return { query: parts[1] };
+          if (u.searchParams.get("channel_id")) return { id: u.searchParams.get("channel_id") };
+        }
+      } catch (e) { /* düz metin olarak dene */ }
+      if (/^UC[\w-]{20,24}$/.test(s)) return { id: s };
+      if (s.startsWith("@")) return { handle: s.split(/[/?\s]/)[0] };
+      if (/^[\w-]{11}$/.test(s)) return { videoId: s };
+      return { query: s.replace(/^@/, "") };
+    }
+
+    function pickChannel(results, wanted) {
+      const list = (results || []).filter((x) => x && (x.type === "channel" || x.authorId));
+      if (!list.length) return null;
+      const want = String(wanted || "").replace(/^@/, "").toLowerCase();
+      const exact = list.find((c) => String(c.channelHandle || "").replace(/^@/, "").toLowerCase() === want)
+        || list.find((c) => String(c.author || "").replace(/\s+/g, "").toLowerCase() === want);
+      return exact || list[0];
+    }
+
+    function thumbUrl(thumbs) {
+      if (!Array.isArray(thumbs) || !thumbs.length) return "";
+      const sorted = [...thumbs].sort((a, b) => (a.width || 0) - (b.width || 0));
+      const mid = sorted.find((t) => (t.width || 0) >= 88) || sorted[sorted.length - 1];
+      return mid.url || "";
+    }
+
+    function estimateViews(videos) {
+      const now = Date.now() / 1000;
+      const monthAgo = now - 30 * 24 * 3600;
+      const list = (videos || []).filter((v) => v && Number(v.published) > 0);
+      list.sort((a, b) => b.published - a.published);
+      const isShort = (v) => Number(v.lengthSeconds) > 0 && Number(v.lengthSeconds) <= 180;
+      const sumViews = (arr) => arr.reduce((s, v) => s + (Number(v.viewCount) || 0), 0);
+      const recent = list.filter((v) => v.published >= monthAgo);
+      let used = recent;
+      let method = "Son 30 günde yüklenen videoların bugünkü toplam izlenmesi alındı. Bu, o videoların yayınlandığı günden beri biriken izlenmedir; tam aylık izlenme değildir.";
+      if (!used.length && list.length) {
+        used = list.slice(0, 15);
+        const newest = used[0].published;
+        const oldest = used[used.length - 1].published;
+        const days = Math.max(30, (newest - oldest) / 86400);
+        const monthlyUploads = used.length / days * 30;
+        const mid = [...used].sort((a, b) => (a.viewCount || 0) - (b.viewCount || 0))[Math.floor(used.length / 2)];
+        const median = Number(mid && mid.viewCount) || 0;
+        const views = monthlyUploads * median;
+        const shortViews = sumViews(used.filter(isShort));
+        const all = sumViews(used) || 1;
+        return {
+          views,
+          shortsShare: shortViews / all,
+          method: "Son 30 günde yeni video bulunamadı. Tahmini aylık görüntülenme, son videoların yükleme sıklığı ve medyan izlenmesiyle hesaplandı."
+        };
+      }
+      if (!used.length) return { views: NaN, shortsShare: 0, method: "Bu kanalda kamuya açık video bulunamadı; görüntülenme tahmini yapılamadı." };
+      const all = sumViews(used) || 1;
+      return { views: sumViews(used), shortsShare: sumViews(used.filter(isShort)) / all, method, count: used.length };
+    }
+
+    function setMsg(text, kind) {
+      const el = $("channel-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? " " + kind : " hidden");
+    }
+
+    async function resolveChannel(parsed) {
+      let id = parsed.id || null;
+      if (parsed.videoId) {
+        const vid = await firstOk((b) => b + "/api/v1/videos/" + encodeURIComponent(parsed.videoId), 10000);
+        id = vid.authorId;
+        if (!id) throw new Error("Bu videodan kanal bulunamadı.");
+      } else if (!id && (parsed.handle || parsed.query)) {
+        const q = parsed.handle || parsed.query;
+        const results = await firstOk((b) => b + "/api/v1/search?q=" + encodeURIComponent(q) + "&type=channel", 10000);
+        const ch = pickChannel(results, parsed.handle || parsed.query);
+        if (!ch) throw new Error("Bu aramayla bir kanal bulunamadı.");
+        id = ch.authorId;
+      }
+      if (!id) throw new Error("Kanal kimliği çözülemedi.");
+      const data = await firstOk((b) => b + "/api/v1/channels/" + encodeURIComponent(id), 12000);
+      let videos = data.latestVideos || [];
+      try {
+        const more = await firstOk((b) => b + "/api/v1/channels/" + encodeURIComponent(id) + "/videos?sort_by=newest", 12000);
+        if (more && Array.isArray(more.videos) && more.videos.length) videos = more.videos;
+      } catch (e) { /* latestVideos yeter */ }
+      return { data, videos };
+    }
+
+    async function addChannel() {
+      const parsed = parseChannelInput($("channel-input").value);
+      if (parsed.error) { setMsg(parsed.error, "err"); return; }
+      const btn = $("channel-btn");
+      btn.disabled = true;
+      btn.textContent = "Bakılıyor…";
+      setMsg("Kanal bilgisi alınıyor…", "ok");
+      try {
+        const { data, videos } = await resolveChannel(parsed);
+        const est = estimateViews(videos);
+        linked = {
+          name: data.author || "Kanal",
+          id: data.authorId,
+          subs: Number(data.subCount) || 0,
+          thumb: thumbUrl(data.authorThumbnails),
+          url: data.authorUrl ? "https://www.youtube.com" + data.authorUrl : (data.authorId ? "https://www.youtube.com/channel/" + data.authorId : ""),
+          views: est.views,
+          shortsShare: est.shortsShare,
+          method: est.method,
+          videoCount: est.count || 0
+        };
+        $("ch-name").textContent = linked.name;
+        $("ch-meta").textContent = formatCompact(linked.subs) + " abone";
+        const img = $("ch-thumb");
+        img.src = linked.thumb || "";
+        img.alt = linked.name;
+        $("ch-status").textContent = "Bu kanalda para kazanmanın açık olup olmadığını kamuya açık verilerden doğrulayamadım. Aşağıdaki gelir, para kazanma açık olsaydı oluşabilecek tahmindir; kesin rakam değildir.";
+        $("ch-views").textContent = Number.isFinite(linked.views) ? formatInt(linked.views) : "—";
+        $("ch-ratio").textContent = Number.isFinite(linked.shortsShare) ? ("%" + Math.round(linked.shortsShare * 100) + " Shorts") : "—";
+        $("ch-method").textContent = linked.method;
+        $("channel-card").classList.remove("hidden");
+        setMsg("Kanal eklendi. Gelir, aşağıdaki RPM değerlerinle hesaplanıyor.", "ok");
+        renderChannelRev();
+      } catch (e) {
+        setMsg((e && e.message) || "Kanal bilgisi alınamadı. Manuel girişi kullanabilirsin.", "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Ekle";
+      }
+    }
+
+    $("channel-btn").addEventListener("click", addChannel);
+    $("channel-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addChannel(); });
+    $("ch-apply").addEventListener("click", () => {
+      if (!linked || !Number.isFinite(linked.views)) return;
+      els.views.value = String(Math.round(linked.views));
+      els.ratio.value = String(Math.round((linked.shortsShare || 0) * 100));
+      calc();
+      els.views.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+
     calc();
   </script>
 </body>
