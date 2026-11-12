@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Gelir Hesaplayıcı</title>
+  <meta name="description" content="Aylık görüntülenme, RPM ve Shorts oranına göre tahmini YouTube geliri hesapla.">
+  <style>
+    :root {
+      --bg: #0f1412;
+      --bg2: #17201c;
+      --card: #1c2622;
+      --line: #2d3b34;
+      --text: #eef3ef;
+      --muted: #8fa097;
+      --accent: #3ecf8e;
+      --accent-dim: #1f6b4a;
+      --warn: #e8b86d;
+      --field: #121a17;
+      --shadow: 0 18px 40px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #1a3a2c 0%, transparent 55%),
+        radial-gradient(800px 400px at 110% 10%, #243528 0%, transparent 50%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    main {
+      width: min(720px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+    header h1 {
+      font-size: clamp(1.6rem, 5vw, 2.15rem);
+      font-weight: 700;
+      letter-spacing: -.03em;
+      margin: 0 0 8px;
+    }
+    header p { margin: 0 0 28px; color: var(--muted); max-width: 38em; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px 22px 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: .78rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 16px;
+      font-weight: 650;
+    }
+    .row { display: grid; gap: 14px; grid-template-columns: 1fr; }
+    @media (min-width: 640px) {
+      .row.two { grid-template-columns: 1fr 1fr; }
+      .row.three { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    label { display: block; font-size: .86rem; margin-bottom: 6px; color: #c9d4cd; }
+    label span { color: var(--muted); font-weight: 400; }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: var(--field);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 1.02rem;
+      font-variant-numeric: tabular-nums;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .hint { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
+    .seg {
+      display: flex;
+      background: var(--field);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .seg button {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 11px 8px;
+      font-size: .95rem;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .seg button.on { background: var(--accent); color: #062016; }
+    .slider-wrap { display: grid; gap: 8px; }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .ratio {
+      display: flex;
+      justify-content: space-between;
+      font-size: .85rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .ratio b { color: var(--text); font-weight: 650; }
+    .results {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 520px) { .results { grid-template-columns: 1fr 1fr; } }
+    .stat {
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 16px 14px;
+    }
+    .stat .k { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .stat .v {
+      font-size: clamp(1.4rem, 5vw, 1.85rem);
+      font-weight: 750;
+      letter-spacing: -.03em;
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+    }
+    .breakdown { margin-top: 14px; font-size: .9rem; color: #c9d4cd; }
+    .breakdown div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+    .note {
+      margin: 0;
+      font-size: .86rem;
+      color: var(--warn);
+      background: #2a2316;
+      border: 1px solid #4a3c1f;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    footer { margin-top: 22px; color: var(--muted); font-size: .8rem; }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>YouTube Gelir Hesaplayıcı</h1>
+      <p>Aylık görüntülenme, RPM ve Shorts oranına göre tahmini gelirini hesapla. Hedef gelirden gereken görüntülenmeyi de çıkarabilirsin.</p>
+    </header>
+
+    <section class="card">
+      <h2>Para birimi</h2>
+      <div class="row two">
+        <div>
+          <label>Gösterim</label>
+          <div class="seg" role="group" aria-label="Para birimi">
+            <button type="button" id="cur-try" class="on">TL</button>
+            <button type="button" id="cur-usd">USD</button>
+          </div>
+        </div>
+        <div id="rate-wrap">
+          <label for="rate">Kur <span>(1 USD = ? TL)</span></label>
+          <input type="text" id="rate" inputmode="decimal" value="42" autocomplete="off">
+          <p class="hint">Kuru kendin gir; internetten çekilmez.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Girdiler</h2>
+      <div class="row two">
+        <div>
+          <label for="views">Aylık görüntülenme</label>
+          <input type="text" id="views" inputmode="numeric" value="250000" autocomplete="off">
+        </div>
+        <div>
+          <label for="target">Hedef aylık gelir</label>
+          <input type="text" id="target" inputmode="decimal" value="50000" autocomplete="off">
+          <p class="hint">Ters hesap: bu geliri almak için gereken görüntülenme.</p>
+        </div>
+      </div>
+      <div class="row two" style="margin-top:14px">
+        <div>
+          <label for="rpm-long">Uzun video RPM <span>(1000 görüntülenme)</span></label>
+          <input type="text" id="rpm-long" inputmode="decimal" value="4" autocomplete="off">
+        </div>
+        <div>
+          <label for="rpm-shorts">Shorts RPM <span>(1000 görüntülenme)</span></label>
+          <input type="text" id="rpm-shorts" inputmode="decimal" value="0,06" autocomplete="off">
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <label for="ratio">Shorts / uzun video oranı</label>
+        <div class="slider-wrap">
+          <input type="range" id="ratio" min="0" max="100" value="40" step="1">
+          <div class="ratio">
+            <span>Uzun video: <b id="long-pct">%60</b></span>
+            <span>Shorts: <b id="shorts-pct">%40</b></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Tahmini gelir</h2>
+      <div class="results">
+        <div class="stat">
+          <div class="k">Aylık</div>
+          <div class="v" id="out-month">—</div>
+        </div>
+        <div class="stat">
+          <div class="k">Yıllık</div>
+          <div class="v" id="out-year">—</div>
+        </div>
+      </div>
+      <div class="breakdown">
+        <div><span>Uzun videodan</span><span id="out-long">—</span></div>
+        <div><span>Shorts’tan</span><span id="out-shorts">—</span></div>
+        <div><span>Hedef gelir için gereken görüntülenme</span><span id="out-needed">—</span></div>
+      </div>
+    </section>
+
+    <p class="note">Rakamlar yalnızca tahmindir. Gerçek gelir; niş, ülke, reklam doldurma oranı, izlenme süresi, mevsim ve YouTube’un ödeme kurallarına göre değişir. Shorts ve uzun videoların RPM’leri birbirinden çok farklı olabilir.</p>
+    <footer><a href="../">Claude projeleri</a></footer>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      views: $("views"), target: $("target"), rate: $("rate"),
+      rpmLong: $("rpm-long"), rpmShorts: $("rpm-shorts"), ratio: $("ratio"),
+      longPct: $("long-pct"), shortsPct: $("shorts-pct"),
+      month: $("out-month"), year: $("out-year"),
+      long: $("out-long"), shorts: $("out-shorts"), needed: $("out-needed"),
+      curTry: $("cur-try"), curUsd: $("cur-usd"), rateWrap: $("rate-wrap")
+    };
+    let currency = "TRY";
+
+    function parseNum(s) {
+      if (s == null) return NaN;
+      let t = String(s).trim().replace(/\s/g, "").replace(/lira|tl|usd|\$/gi, "");
+      if (!t) return NaN;
+      if (t.includes(",") && t.includes(".")) {
+        if (t.lastIndexOf(",") > t.lastIndexOf(".")) t = t.replace(/\./g, "").replace(",", ".");
+        else t = t.replace(/,/g, "");
+      } else if ((t.match(/,/g) || []).length === 1 && !t.includes(".")) {
+        t = t.replace(",", ".");
+      } else {
+        t = t.replace(/,/g, "");
+      }
+      const n = Number(t);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function formatMoney(n) {
+      const loc = "tr-TR";
+      if (!Number.isFinite(n)) return "—";
+      const opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+      return currency === "USD"
+        ? new Intl.NumberFormat(loc, opts).format(n) + " $"
+        : new Intl.NumberFormat(loc, opts).format(n) + " TL";
+    }
+    function formatViews(n) {
+      if (!Number.isFinite(n) || n < 0) return "—";
+      return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.ceil(n));
+    }
+    function toDisplay(n) {
+      return currency === "USD" ? n : n * parseNum(els.rate.value);
+    }
+
+    function calc() {
+      const shortsShare = Number(els.ratio.value) / 100;
+      els.longPct.textContent = "%" + Math.round((1 - shortsShare) * 100);
+      els.shortsPct.textContent = "%" + Math.round(shortsShare * 100);
+      els.rateWrap.style.display = currency === "TRY" ? "block" : "none";
+
+      const views = parseNum(els.views.value);
+      const rpmL = parseNum(els.rpmLong.value);
+      const rpmS = parseNum(els.rpmShorts.value);
+      const target = parseNum(els.target.value);
+      const rate = parseNum(els.rate.value);
+      const rateOk = currency === "USD" || (Number.isFinite(rate) && rate > 0);
+
+      const ok = [views, rpmL, rpmS].every((n) => Number.isFinite(n) && n >= 0) && rateOk;
+      if (!ok) {
+        els.month.textContent = els.year.textContent = els.long.textContent = els.shorts.textContent = els.needed.textContent = "—";
+        return;
+      }
+      const longViews = views * (1 - shortsShare);
+      const shortViews = views * shortsShare;
+      const monthUSD = (longViews / 1000) * rpmL + (shortViews / 1000) * rpmS;
+      const longUSD = (longViews / 1000) * rpmL;
+      const shortUSD = (shortViews / 1000) * rpmS;
+      els.month.textContent = formatMoney(toDisplay(monthUSD));
+      els.year.textContent = formatMoney(toDisplay(monthUSD * 12));
+      els.long.textContent = formatMoney(toDisplay(longUSD));
+      els.shorts.textContent = formatMoney(toDisplay(shortUSD));
+
+      const rpv = ((1 - shortsShare) * rpmL + shortsShare * rpmS) / 1000;
+      if (Number.isFinite(target) && target >= 0 && rpv > 0) {
+        const targetUSD = currency === "USD" ? target : target / rate;
+        els.needed.textContent = formatViews(targetUSD / rpv);
+      } else {
+        els.needed.textContent = "—";
+      }
+    }
+
+    function setCur(c) {
+      currency = c;
+      els.curTry.classList.toggle("on", c === "TRY");
+      els.curUsd.classList.toggle("on", c === "USD");
+      calc();
+    }
+    els.curTry.addEventListener("click", () => setCur("TRY"));
+    els.curUsd.addEventListener("click", () => setCur("USD"));
+    ["views","target","rate","rpm-long","rpm-shorts","ratio"].forEach((id) => {
+      $(id).addEventListener("input", calc);
+    });
+    calc();
+  </script>
+</body>
+</html>
