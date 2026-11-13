@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Fikri Puanlama Kartı</title>
+<style>
+:root{--bg:#0f1412;--card:#18201c;--line:#2a3530;--txt:#e8efe9;--mut:#9aaba1;--acc:#3fd68f;--warn:#f0b44c;--bad:#ef6b6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:26px;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.card h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:0 0 12px}
+label{display:block;font-size:14px;margin-bottom:6px}
+input[type=text],textarea{width:100%;background:#0f1512;border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:10px 12px;font:inherit}
+textarea{resize:vertical;min-height:60px}
+.crit{margin:14px 0}
+.crit .row{display:flex;justify-content:space-between;gap:8px}
+.crit .row b{color:var(--acc);min-width:2.5em;text-align:right}
+.crit small{color:var(--mut);display:block;margin-bottom:4px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.score{display:flex;align-items:center;gap:16px;margin-top:8px}
+.big{font-size:40px;font-weight:700;color:var(--acc);line-height:1}
+.big span{font-size:16px;color:var(--mut);font-weight:400}
+.verdict{flex:1;color:var(--txt)}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+button{background:var(--acc);color:#06210f;border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+button.small{padding:6px 10px;font-size:13px}
+.msg{color:var(--mut);font-size:13px;margin-top:8px;min-height:1em}
+ol{list-style:none;padding:0;margin:0}
+li.idea{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+li.idea .pts{font-size:22px;font-weight:700;min-width:52px;text-align:center}
+li.idea .info{flex:1;min-width:0}
+li.idea .t{font-weight:600;word-wrap:break-word}
+li.idea .d{color:var(--mut);font-size:13px}
+li.idea .acts{display:flex;flex-direction:column;gap:6px}
+.empty{color:var(--mut)}
+.good{color:var(--acc)}.mid{color:var(--warn)}.low{color:var(--bad)}
+footer{color:var(--mut);font-size:13px}
+footer a{color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>Video Fikri Puanlama Kartı</h1>
+<p class="sub">Fikrini yaz, ölçütleri 1–10 arası puanla, toplam puanı gör. Kaydettiğin fikirler bu tarayıcıda saklanır ve puana göre sıralanır.</p>
+
+<section class="card">
+  <h2>Yeni fikir</h2>
+  <label for="title">Video fikri</label>
+  <input type="text" id="title" maxlength="140" placeholder="Örn: 1 hafta boyunca sadece 100 TL ile yaşamak">
+  <label for="note" style="margin-top:10px">Not (isteğe bağlı)</label>
+  <textarea id="note" maxlength="400" placeholder="Kısa açıklama, hedef kitle, kaynak…"></textarea>
+  <div id="crits"></div>
+  <div class="score">
+    <div class="big" id="total">0<span> / 100</span></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+  <div class="btns">
+    <button id="save">Fikri kaydet</button>
+    <button class="ghost" id="reset">Temizle</button>
+  </div>
+  <div class="msg" id="msg"></div>
+</section>
+
+<section class="card">
+  <h2>Kayıtlı fikirler (puana göre)</h2>
+  <ol id="list"></ol>
+</section>
+
+<footer>Puanlar senin değerlendirmendir; bir videonun başarısını garanti etmez. · <a href="../">Claude projeleri</a></footer>
+</main>
+<script>
+const CRITS=[
+ {k:"merak",n:"Merak uyandırma",h:"İzleyici başlığı görünce tıklamak ister mi?",w:1.2},
+ {k:"kitle",n:"Hedef kitleye uygunluk",h:"Kanalının izleyicisine ne kadar uyuyor?",w:1.1},
+ {k:"arama",n:"Aranabilirlik",h:"İnsanlar bu konuyu YouTube'da arıyor mu?",w:1},
+ {k:"uretim",n:"Üretim kolaylığı",h:"Zaman, bütçe ve ekipman olarak ne kadar kolay?",w:0.8},
+ {k:"kapak",n:"Kapak/başlık potansiyeli",h:"Güçlü bir kapak ve kısa başlık çıkar mı?",w:1.1},
+ {k:"ozgun",n:"Özgünlük",h:"Benzerlerinden farklı bir açı var mı?",w:0.8}
+];
+const KEY="videoFikriPuanlama.v1";
+const $=id=>document.getElementById(id);
+const vals={};
+$("crits").innerHTML=CRITS.map(c=>`<div class="crit"><div class="row"><span>${c.n}</span><b id="v-${c.k}">5</b></div><small>${c.h}</small><input type="range" min="1" max="10" value="5" id="r-${c.k}" aria-label="${c.n}"></div>`).join("");
+CRITS.forEach(c=>{vals[c.k]=5;$("r-"+c.k).addEventListener("input",e=>{vals[c.k]=+e.target.value;$("v-"+c.k).textContent=e.target.value;update()})});
+function score(v){const tw=CRITS.reduce((s,c)=>s+c.w,0);const s=CRITS.reduce((s,c)=>s+(v[c.k]-1)/9*c.w,0);return Math.round(s/tw*100)}
+function cls(p){return p>=70?"good":p>=45?"mid":"low"}
+function verdict(p,v){
+ let t=p>=80?"Çok güçlü fikir, önceliğe al.":p>=65?"İyi fikir, çekmeye değer.":p>=45?"Orta; birkaç yönü güçlendirilmeli.":"Zayıf; şimdilik beklet ya da baştan düşün.";
+ const sorted=[...CRITS].sort((a,b)=>v[a.k]-v[b.k]);const lo=sorted[0],hi=sorted[sorted.length-1];
+ if(v[hi.k]>=8) t+=` En güçlü yanı: ${hi.n.toLowerCase()}.`;
+ if(v[lo.k]<=4) t+=` En zayıf yanı: ${lo.n.toLowerCase()}.`;
+ return t}
+function update(){const p=score(vals);$("total").innerHTML=p+'<span> / 100</span>';$("total").className="big "+cls(p);$("verdict").textContent=verdict(p,vals)}
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function store(a){localStorage.setItem(KEY,JSON.stringify(a))}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function render(){
+ const a=load().sort((x,y)=>y.p-x.p||y.t-x.t);
+ $("list").innerHTML=a.length?a.map(i=>`<li class="idea"><div class="pts ${cls(i.p)}">${i.p}</div><div class="info"><div class="t">${esc(i.title)}</div>${i.note?`<div class="d">${esc(i.note)}</div>`:""}<div class="d">${CRITS.map(c=>c.n.split(" ")[0]+" "+i.v[c.k]).join(" · ")}</div><div class="d">${esc(verdict(i.p,i.v))}</div></div><div class="acts"><button class="ghost small" data-e="${i.id}">Düzenle</button><button class="ghost small" data-d="${i.id}">Kaldır</button></div></li>`).join(""):'<li class="empty">Henüz kayıtlı fikir yok.</li>'}
+let editing=null;
+function setForm(i){$("title").value=i?i.title:"";$("note").value=i?i.note:"";CRITS.forEach(c=>{const x=i?i.v[c.k]:5;vals[c.k]=x;$("r-"+c.k).value=x;$("v-"+c.k).textContent=x});update()}
+$("save").onclick=()=>{const title=$("title").value.trim();if(!title){$("msg").textContent="Önce fikri yaz.";$("title").focus();return}
+ const a=load();const item={id:editing||Date.now().toString(36)+Math.random().toString(36).slice(2,6),title,note:$("note").value.trim(),v:{...vals},p:score(vals),t:Date.now()};
+ const ix=a.findIndex(x=>x.id===item.id);if(ix>=0)a[ix]=item;else a.push(item);store(a);
+ $("msg").textContent=editing?"Fikir güncellendi.":"Fikir kaydedildi.";editing=null;$("save").textContent="Fikri kaydet";setForm(null);render()};
+$("reset").onclick=()=>{editing=null;$("save").textContent="Fikri kaydet";setForm(null);$("msg").textContent=""};
+$("list").onclick=e=>{const d=e.target.dataset;if(d.d){if(confirm("Bu fikir listeden kaldırılsın mı?")){store(load().filter(x=>x.id!==d.d));render()}}
+ else if(d.e){const i=load().find(x=>x.id===d.e);if(i){editing=i.id;setForm(i);$("save").textContent="Değişiklikleri kaydet";$("msg").textContent="Düzenleniyor: "+i.title;window.scrollTo({top:0,behavior:"smooth"})}}};
+update();render();
+</script>
+</body>
+</html>
